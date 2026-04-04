@@ -115,10 +115,10 @@
     <!-- OPORTUNIDADES -->
     <div id="v-oportunidades" class="view">
       <div class="toolbar">
-        <input  type="text"  class="fi" id="srch"  placeholder="🔍 Buscar empresa ou CNPJ…" oninput="renderTable()" style="width:210px">
-        <select class="fi" id="fSt"  onchange="renderTable()"><option value="">Todos os status</option></select>
-        <select class="fi" id="fPar" onchange="renderTable()"><option value="">Todos os parceiros</option></select>
-        <select class="fi" id="fApv" onchange="renderTable()">
+        <input  type="text"  class="fi" id="srch"  placeholder="🔍 Buscar empresa ou CNPJ…" oninput="tableFilter()" style="width:210px">
+        <select class="fi" id="fSt"  onchange="tableFilter()"><option value="">Todos os status</option></select>
+        <select class="fi" id="fPar" onchange="tableFilter()"><option value="">Todos os parceiros</option></select>
+        <select class="fi" id="fApv" onchange="tableFilter()">
           <option value="">Aprovação: Todas</option>
           <option>Pendente</option><option>Aprovado</option><option>Rejeitado</option>
         </select>
@@ -133,6 +133,7 @@
       <div class="tbl-wrap"><div class="tbl-scroll">
         <table><thead id="tHead"></thead><tbody id="tBody"></tbody></table>
       </div></div>
+      <div id="tPager"></div>
     </div>
 
     <!-- PIPELINE -->
@@ -232,6 +233,7 @@
       <div class="tbl-wrap"><div class="tbl-scroll">
         <table><thead id="drillHead"></thead><tbody id="drillBody"></tbody></table>
       </div></div>
+      <div id="drillPager"></div>
     </div>
   </div>
 </div>

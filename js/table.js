@@ -65,6 +65,22 @@ function _filteredOpps() {
   return list;
 }
 
+function tableFilter() {
+  APP.tPage = 0;
+  renderTable();
+}
+
+function goPage(n) {
+  APP.tPage = n;
+  renderTable();
+}
+
+function setPageSize(n) {
+  APP.tPageSize = n;
+  APP.tPage = 0;
+  renderTable();
+}
+
 function sortBy(col) {
   if (APP.tSort.col === col) {
     APP.tSort.dir = APP.tSort.dir === 'asc' ? 'desc' : 'asc';
@@ -72,13 +88,55 @@ function sortBy(col) {
     APP.tSort.col = col;
     APP.tSort.dir = 'asc';
   }
+  APP.tPage = 0;
   renderTable();
+}
+
+// ── Pagination HTML builder (also used by drill-down) ─────────
+function buildPagerHTML(total, page, ps, goFn, sizeFn) {
+  const pages = Math.ceil(total / ps);
+  if (pages <= 1 && total <= ps) return '';
+  const from = page * ps + 1;
+  const to   = Math.min((page + 1) * ps, total);
+
+  const sizeOpts = [10, 30, 50, 100]
+    .map(n => `<option value="${n}"${ps === n ? ' selected' : ''}>${n} / pág</option>`)
+    .join('');
+
+  // Smart page number list
+  let nums = [];
+  if (pages <= 7) {
+    nums = Array.from({ length: pages }, (_, i) => i);
+  } else if (page < 4) {
+    nums = [0, 1, 2, 3, 4, -1, pages - 1];
+  } else if (page > pages - 5) {
+    nums = [0, -1, pages - 5, pages - 4, pages - 3, pages - 2, pages - 1];
+  } else {
+    nums = [0, -1, page - 1, page, page + 1, -1, pages - 1];
+  }
+
+  const btns = nums.map(p =>
+    p === -1
+      ? `<span class="pager-ellipsis">…</span>`
+      : `<button class="pager-btn${p === page ? ' active' : ''}" onclick="${goFn}(${p})">${p + 1}</button>`
+  ).join('');
+
+  return `<div class="pager">
+    <span class="pager-info">${from}–${to} de ${total}</span>
+    <button class="pager-btn" onclick="${goFn}(${page - 1})"${page === 0 ? ' disabled' : ''}>‹</button>
+    ${btns}
+    <button class="pager-btn" onclick="${goFn}(${page + 1})"${page >= pages - 1 ? ' disabled' : ''}>›</button>
+    <select class="pager-size" onchange="${sizeFn}(+this.value)">${sizeOpts}</select>
+  </div>`;
 }
 
 // ── Render ────────────────────────────────────────────────────
 function renderTable() {
-  const list = _filteredOpps();
-  const cols = ALL_COLS.filter(c => APP.visCols.includes(c.k));
+  const full = _filteredOpps();
+  const total = full.length;
+  const start = APP.tPage * APP.tPageSize;
+  const list  = full.slice(start, start + APP.tPageSize);
+  const cols  = ALL_COLS.filter(c => APP.visCols.includes(c.k));
 
   const si = col => {
     const ic = APP.tSort.col === col ? (APP.tSort.dir === 'asc' ? '↑' : '↓') : '↕';
@@ -96,10 +154,11 @@ function renderTable() {
   }).join('')}</tr>`;
 
   const tbody = g('tBody');
-  if (!list.length) {
+  if (!total) {
     tbody.innerHTML = `<tr><td colspan="${cols.length}">
       <div class="empty-st"><div class="empty-ic">🔍</div>Nenhuma oportunidade encontrada</div>
     </td></tr>`;
+    g('tPager').innerHTML = '';
     return;
   }
 
@@ -158,6 +217,8 @@ function renderTable() {
 
     return `<tr class="${rej ? 'rej-row' : ''}" ondblclick="editOp(${o.id})">${cells.join('')}</tr>`;
   }).join('');
+
+  g('tPager').innerHTML = buildPagerHTML(total, APP.tPage, APP.tPageSize, 'goPage', 'setPageSize');
 }
 
 // ── Export CSV ────────────────────────────────────────────────

@@ -42,4 +42,6 @@ const APP = {
   editId     : null,
   editTasks  : [],
   tSort      : { col: 'empresa', dir: 'asc' },
+  tPage      : 0,
+  tPageSize  : 30,
 };

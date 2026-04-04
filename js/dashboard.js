@@ -191,23 +191,38 @@ function _svgText(svg, x, y, txt, fill, size, family, weight) {
 
 // ── Drill-down (shared) ──────────────────────────────────────
 function drill(title, list) {
-  g('mDrillTitle').textContent = `🔍 ${title} (${(list || []).length})`;
+  const safe  = list || [];
   const cols  = ['empresa','cnpj','contato','produto','status','fechamento','parceiro','aprovacao'];
   const label = { empresa:'Empresa',cnpj:'CNPJ',contato:'Contato',produto:'Produto',status:'Etapa',fechamento:'Fechamento',parceiro:'Parceiro',aprovacao:'Aprovação' };
+  let _page = 0;
+  let _ps   = APP.tPageSize;
+
   g('drillHead').innerHTML = `<tr>${cols.map(c => `<th>${label[c]}</th>`).join('')}</tr>`;
-  g('drillBody').innerHTML = (list || []).map(o => {
-    const par = APP.partners.find(p => p.id === o.parceiro_id) || { nome: '—', site: null };
-    const rej = o.aprovacao === 'Rejeitado';
-    return `<tr class="${rej ? 'rej-row' : ''}">
-      <td class="td-main"><span class="ename">${logoImg(o.site_empresa, o.empresa)}${esc(o.empresa)}${rej ? ' 🚫' : ''}</span></td>
-      <td>${esc(o.cnpj || '—')}</td>
-      <td>${esc(o.contato || '')}</td>
-      <td>${esc(o.produto || '')}</td>
-      <td><span class="badge ${badgeCls(o.status)}">${esc(o.status)}</span></td>
-      <td>${fmtMonth(o.fechamento)}</td>
-      <td><span class="ename">${logoImg(par.site, par.nome)}${esc(par.nome)}</span></td>
-      <td><span class="badge ${badgeCls(o.aprovacao)}">${esc(o.aprovacao)}</span></td>
-    </tr>`;
-  }).join('');
+
+  window._drillGoPage = function(n) { _page = n; _render(); };
+  window._drillSetSize = function(n) { _ps = n; _page = 0; _render(); };
+
+  function _render() {
+    const total = safe.length;
+    const start = _page * _ps;
+    g('mDrillTitle').textContent = `🔍 ${title} (${total})`;
+    g('drillBody').innerHTML = safe.slice(start, start + _ps).map(o => {
+      const par = APP.partners.find(p => p.id === o.parceiro_id) || { nome: '—', site: null };
+      const rej = o.aprovacao === 'Rejeitado';
+      return `<tr class="${rej ? 'rej-row' : ''}">
+        <td class="td-main"><span class="ename">${logoImg(o.site_empresa, o.empresa)}${esc(o.empresa)}${rej ? ' 🚫' : ''}</span></td>
+        <td>${esc(o.cnpj || '—')}</td>
+        <td>${esc(o.contato || '')}</td>
+        <td>${esc(o.produto || '')}</td>
+        <td><span class="badge ${badgeCls(o.status)}">${esc(o.status)}</span></td>
+        <td>${fmtMonth(o.fechamento)}</td>
+        <td><span class="ename">${logoImg(par.site, par.nome)}${esc(par.nome)}</span></td>
+        <td><span class="badge ${badgeCls(o.aprovacao)}">${esc(o.aprovacao)}</span></td>
+      </tr>`;
+    }).join('');
+    g('drillPager').innerHTML = buildPagerHTML(total, _page, _ps, '_drillGoPage', '_drillSetSize');
+  }
+
+  _render();
   openM('mDrill');
 }

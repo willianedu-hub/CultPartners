@@ -435,6 +435,18 @@ tbody tr.rej-row:hover .td-sticky { background:#ffe8e8; }
 .elogo { width:18px; height:18px; border-radius:3px; object-fit:contain; vertical-align:middle; margin-right:6px; border:1px solid var(--border); background:#fff; flex-shrink:0; }
 .ename { display:inline-flex; align-items:center; }
 
+/* ─── PAGINATION ──────────────────────────────────── */
+#tPager, #drillPager { padding:4px 2px 2px; }
+.pager { display:flex; align-items:center; gap:4px; padding:8px 2px; font-size:13px; color:var(--text2); flex-wrap:wrap; }
+.pager-info { margin-right:auto; color:var(--text3); font-size:12px; }
+.pager-ellipsis { padding:0 4px; color:var(--text3); }
+.pager-btn { min-width:30px; height:28px; padding:0 7px; border:1px solid var(--border); background:var(--surface); border-radius:6px; cursor:pointer; font-size:12px; color:var(--text2); transition:background .12s,border-color .12s,color .12s; }
+.pager-btn:hover:not(:disabled) { background:var(--surface2); border-color:var(--primary); color:var(--primary); }
+.pager-btn.active { background:var(--primary); color:#fff; border-color:var(--primary); font-weight:600; }
+.pager-btn:disabled { opacity:.35; cursor:default; }
+.pager-size { height:28px; border:1px solid var(--border); border-radius:6px; padding:0 6px; font-size:12px; color:var(--text2); background:var(--surface); cursor:pointer; margin-left:4px; }
+.pager-size:hover { border-color:var(--primary); }
+
 /* ─── BADGES ──────────────────────────────────────── */
 .badge { display:inline-flex; align-items:center; gap:4px; padding:2px 9px; border-radius:20px; font-size:11px; font-weight:600; white-space:nowrap; }
 .bdot { width:5px; height:5px; border-radius:50%; flex-shrink:0; }
