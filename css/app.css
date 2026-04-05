@@ -447,6 +447,25 @@ tbody tr.rej-row:hover .td-sticky { background:#ffe8e8; }
 .pager-size { height:28px; border:1px solid var(--border); border-radius:6px; padding:0 6px; font-size:12px; color:var(--text2); background:var(--surface); cursor:pointer; margin-left:4px; }
 .pager-size:hover { border-color:var(--primary); }
 
+/* ─── ALERT TABLE (60d sem tarefa) ───────────────── */
+.alr-wrap { border:2px solid #f59e0b; border-radius:var(--r-lg); overflow:hidden; box-shadow:0 4px 24px rgba(245,158,11,.18); margin-top:8px; }
+.alr-header { display:flex; align-items:center; gap:14px; padding:16px 20px; background:linear-gradient(135deg,#fffbeb 0%,#fef3c7 100%); border-bottom:1.5px solid #f59e0b; }
+.alr-ico { font-size:30px; line-height:1; flex-shrink:0; }
+.alr-title { font-family:'Rajdhani',sans-serif; font-weight:700; font-size:19px; color:#92400e; }
+.alr-sub { font-size:12px; color:#b45309; margin-top:3px; }
+.alr-tbl { width:100%; border-collapse:collapse; background:#fff; }
+.alr-tbl thead th { background:#fef3c7; color:#92400e; padding:8px 14px; font-size:11px; font-weight:700; text-align:left; border-bottom:1px solid #f59e0b; text-transform:uppercase; letter-spacing:.5px; }
+.alr-tbl td { padding:10px 14px; font-size:13px; color:var(--text); }
+.alr-row { border-bottom:1px solid var(--border); cursor:pointer; transition:background .12s; }
+.alr-row:hover td { background:#fffbeb !important; }
+.alr-row:last-child { border-bottom:none; }
+.alr-high td { background:#fff7ed; }
+.alr-critical td { background:#fef2f2; }
+.alr-critical:hover td { background:#fee2e2 !important; }
+.dias-badge { display:inline-block; background:#f59e0b; color:#fff; padding:2px 9px; border-radius:20px; font-size:11px; font-weight:700; }
+.alr-high .dias-badge { background:#ea580c; }
+.alr-critical .dias-badge { background:#dc2626; }
+
 /* ─── BADGES ──────────────────────────────────────── */
 .badge { display:inline-flex; align-items:center; gap:4px; padding:2px 9px; border-radius:20px; font-size:11px; font-weight:600; white-space:nowrap; }
 .bdot { width:5px; height:5px; border-radius:50%; flex-shrink:0; }

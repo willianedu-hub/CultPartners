@@ -48,12 +48,44 @@ function _renderStatCards(ops, tot, atv, gnh, pnd) {
 // ── Alerts (60 dias sem tarefa) ──────────────────────────────
 function _renderAlerts(ops) {
   const warns = ops.filter(needsTaskWarning);
-  g('dashAlerts').innerHTML = warns.length
-    ? `<div class="alert alert-warn" style="margin-bottom:16px">
-        ⚠️ <strong>${warns.length} oportunidade(s)</strong> aprovada(s) há mais de 60 dias sem tarefa ativa:
-        ${warns.map(o => `<b>${esc(o.empresa)}</b>`).join(', ')}.
-       </div>`
-    : '';
+  const el = g('dashAlerts');
+  if (!warns.length) { el.innerHTML = ''; return; }
+
+  const sorted = [...warns].sort((a, b) => daysSince(b.approved_at) - daysSince(a.approved_at));
+
+  const rows = sorted.map(o => {
+    const par  = APP.partners.find(p => p.id === o.parceiro_id) || { nome: '—', site: null };
+    const dias = daysSince(o.approved_at);
+    const cls  = dias > 120 ? 'alr-critical' : dias > 90 ? 'alr-high' : '';
+    return `<tr class="alr-row ${cls}" onclick="editOp(${o.id})" title="Clique para editar">
+      <td><span class="ename">${logoImg(o.site_empresa, o.empresa)}${esc(o.empresa)}</span></td>
+      <td><span class="ename">${logoImg(par.site, par.nome)}${esc(par.nome)}</span></td>
+      <td>${esc(o.produto || '—')}</td>
+      <td><span class="badge ${badgeCls(o.status)}">${esc(o.status)}</span></td>
+      <td>${fmtDate(o.approved_at)}</td>
+      <td><span class="dias-badge">${dias}d</span></td>
+    </tr>`;
+  }).join('');
+
+  el.innerHTML = `
+    <div class="alr-wrap">
+      <div class="alr-header">
+        <span class="alr-ico">⚠️</span>
+        <div>
+          <div class="alr-title">Atenção — Oportunidades Paradas</div>
+          <div class="alr-sub">${sorted.length} oportunidade${sorted.length > 1 ? 's' : ''} aprovada${sorted.length > 1 ? 's' : ''} há mais de 60 dias sem tarefa ativa. Clique em uma linha para agir.</div>
+        </div>
+      </div>
+      <div class="tbl-scroll">
+        <table class="alr-tbl">
+          <thead><tr>
+            <th>Empresa</th><th>Parceiro</th><th>Produto</th>
+            <th>Etapa</th><th>Aprovado em</th><th>Dias parado</th>
+          </tr></thead>
+          <tbody>${rows}</tbody>
+        </table>
+      </div>
+    </div>`;
 }
 
 // ── Donut ────────────────────────────────────────────────────
