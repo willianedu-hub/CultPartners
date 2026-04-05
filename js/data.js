@@ -282,6 +282,26 @@ const DB = {
     if (error) throw error;
   },
 
+  // ── Senha ────────────────────────────────────────────────
+
+  async changePassword(role, id, nova) {
+    const fn = role === 'admin' ? 'fn_set_senha_admin' : 'fn_set_senha_parceiro';
+    const { error } = await sb.rpc(fn, { p_id: id, p_senha: nova });
+    if (error) throw error;
+  },
+
+  // ── Audit Log ────────────────────────────────────────────
+
+  async loadAuditLog() {
+    const { data, error } = await sb
+      .from('audit_log')
+      .select('*')
+      .order('created_at', { ascending: false })
+      .limit(2000);
+    if (error) throw error;
+    return data || [];
+  },
+
   // ── Preferências de colunas ──────────────────────────────
 
   async loadColPrefs(userKey) {

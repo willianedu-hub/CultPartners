@@ -174,6 +174,8 @@ async function approveOp(id) {
     await DB.approveOpp(id, APP.cu.pid);
     APP.opps = await DB.loadOpps(APP.cu.role === 'partner' ? APP.cu.pid : null);
     renderTable();
+    renderDash();
+    closeM('mDrill');
     toast('✅ Oportunidade aprovada!');
   } catch (e) {
     toast('Erro: ' + e.message, 'bad');
@@ -219,6 +221,8 @@ async function confirmReject() {
     closeM('mRej');
     APP.opps = await DB.loadOpps(APP.cu.role === 'partner' ? APP.cu.pid : null);
     renderTable();
+    renderDash();
+    closeM('mDrill');
     toast('❌ Oportunidade rejeitada.', 'bad');
   } catch (e) {
     toast('Erro: ' + e.message, 'bad');

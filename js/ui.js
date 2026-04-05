@@ -35,11 +35,11 @@ function closeM(id) {
   if (!el) return;
   el.classList.remove('open');
   // Modais criados dinamicamente (ex: rejeição) são removidos do DOM
-  const PERSISTENT = ['mOp', 'mCad', 'mDrill'];
+  const PERSISTENT = ['mOp', 'mCad', 'mDrill', 'mSenha'];
   if (!PERSISTENT.includes(id)) el.remove();
 }
 // Fecha ao clicar no backdrop
-['mOp', 'mCad', 'mDrill'].forEach(id => {
+['mOp', 'mCad', 'mDrill', 'mSenha'].forEach(id => {
   const el = g(id);
   if (el) el.addEventListener('click', e => { if (e.target === el) closeM(id); });
 });
@@ -130,6 +130,7 @@ function daysSince(ds) {
 
 function needsTaskWarning(op) {
   if (op.aprovacao !== 'Aprovado') return false;
+  if (op.status === 'Ganho') return false;
   if ((op.tarefas || []).filter(t => !t.concluida).length > 0) return false;
   return daysSince(op.approved_at) > 60;
 }

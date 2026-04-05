@@ -4,6 +4,8 @@
 // ============================================================
 
 function openCad(type) {
+  g('logsSection').style.display = 'none';
+  g('cfgHint').style.display = '';
   const titles = { status: '🏷️ Status do Funil', parceiros: '🤝 Parceiros', produtos: '📦 Produtos / Serviços' };
   g('mCadTitle').textContent = titles[type] || type;
   const body = g('mCadBody');
@@ -261,4 +263,131 @@ async function delProduct(id) {
     toast('🗑 Produto desativado.', 'bad');
   } catch (e) { toast('Erro: ' + e.message, 'bad'); }
   finally { loadingShow(false); }
+}
+
+// ════════════════════════════════════════
+//  LOG DE ATIVIDADES (admin only)
+// ════════════════════════════════════════
+let _logData = [], _logPage = 0, _logPs = 30;
+
+async function openLogs() {
+  g('cfgHint').style.display = 'none';
+  const sec = g('logsSection');
+  sec.style.display = 'block';
+  sec.innerHTML = `<div class="log-wrap">
+    <div class="log-header">
+      <div class="log-title">🗂️ Log de Atividades</div>
+      <div class="log-filters">
+        <input  class="fi" id="logSrch"   type="text"    placeholder="🔍 Buscar usuário…" oninput="logFilter()" style="width:175px">
+        <select class="fi" id="logTabela" onchange="logFilter()">
+          <option value="">Todas as tabelas</option>
+          <option>oportunidades</option><option>parceiros</option><option>tarefas</option>
+          <option>status_funil</option><option>produtos</option>
+        </select>
+        <select class="fi" id="logAcao" onchange="logFilter()">
+          <option value="">Todas as ações</option>
+          <option>INSERT</option><option>UPDATE</option><option>DELETE</option>
+        </select>
+        <button class="btn btn-ghost btn-sm" onclick="openLogs()">↻ Atualizar</button>
+      </div>
+    </div>
+    <div class="tbl-wrap"><div class="tbl-scroll">
+      <table><thead id="logHead"></thead><tbody id="logBody"></tbody></table>
+    </div></div>
+    <div id="logPager"></div>
+  </div>`;
+
+  loadingShow(true);
+  try {
+    _logData = await DB.loadAuditLog();
+    _logPage = 0;
+    _renderLogsTbl();
+  } catch (e) {
+    toast('Erro ao carregar logs: ' + e.message, 'bad');
+  } finally {
+    loadingShow(false);
+  }
+}
+
+function logFilter() {
+  _logPage = 0;
+  _renderLogsTbl();
+}
+
+function logGoPage(n) {
+  _logPage = n;
+  _renderLogsTbl();
+}
+
+function logSetSize(n) {
+  _logPs = n;
+  _logPage = 0;
+  _renderLogsTbl();
+}
+
+function _renderLogsTbl() {
+  const srch   = (g('logSrch')?.value   || '').toLowerCase();
+  const tabela = g('logTabela')?.value  || '';
+  const acao   = g('logAcao')?.value    || '';
+
+  const partnerNames = new Set(APP.partners.map(p => p.nome));
+
+  let list = _logData;
+  if (srch)   list = list.filter(r => (r.usuario || '').toLowerCase().includes(srch));
+  if (tabela) list = list.filter(r => r.tabela === tabela);
+  if (acao)   list = list.filter(r => r.acao === acao);
+
+  const total = list.length;
+  const start = _logPage * _logPs;
+  const page  = list.slice(start, start + _logPs);
+
+  const headEl = g('logHead'), bodyEl = g('logBody');
+  if (!headEl) return;
+
+  headEl.innerHTML = `<tr>
+    <th style="width:140px">Data/Hora</th>
+    <th>Tabela</th>
+    <th style="width:80px">Ação</th>
+    <th style="width:60px">ID</th>
+    <th>Usuário</th>
+    <th>Detalhes</th>
+  </tr>`;
+
+  if (!total) {
+    bodyEl.innerHTML = `<tr><td colspan="6"><div class="empty-st"><div class="empty-ic">🔍</div>Nenhum registro encontrado</div></td></tr>`;
+    g('logPager').innerHTML = '';
+    return;
+  }
+
+  bodyEl.innerHTML = page.map(r => {
+    const isPartner = partnerNames.has(r.usuario);
+    const rowCls    = isPartner ? 'log-partner' : 'log-admin';
+    const acaoCls   = r.acao === 'DELETE' ? 'log-del' : r.acao === 'INSERT' ? 'log-ins' : 'log-upd';
+    const details   = _logDetails(r);
+    return `<tr class="${rowCls}">
+      <td style="font-size:11px;color:var(--text3);white-space:nowrap">${fmtDateTime(r.created_at)}</td>
+      <td><code style="font-size:11px">${esc(r.tabela || '—')}</code></td>
+      <td><span class="log-badge ${acaoCls}">${esc(r.acao || '—')}</span></td>
+      <td style="color:var(--text3);font-size:12px">${r.registro_id || '—'}</td>
+      <td>
+        <span style="font-size:12px;font-weight:600;color:${isPartner ? 'var(--primary)' : 'var(--accent)'}">${esc(r.usuario || '—')}</span>
+        <span style="font-size:10px;color:var(--text3);margin-left:4px">${isPartner ? 'Parceiro' : 'Admin'}</span>
+      </td>
+      <td style="font-size:11px;color:var(--text2);max-width:300px">${details}</td>
+    </tr>`;
+  }).join('');
+
+  g('logPager').innerHTML = buildPagerHTML(total, _logPage, _logPs, 'logGoPage', 'logSetSize');
+}
+
+function _logDetails(r) {
+  try {
+    const after  = r.dados_depois ? (typeof r.dados_depois === 'string' ? JSON.parse(r.dados_depois) : r.dados_depois) : null;
+    const before = r.dados_antes  ? (typeof r.dados_antes  === 'string' ? JSON.parse(r.dados_antes)  : r.dados_antes)  : null;
+    const src    = after || before;
+    if (!src) return '—';
+    const keys = ['empresa','nome','aprovacao','status','motivo_rejeicao'];
+    const parts = keys.filter(k => src[k] != null).map(k => `<b>${k}:</b> ${esc(String(src[k]))}`);
+    return parts.length ? parts.join(' · ') : esc(JSON.stringify(src).slice(0, 80));
+  } catch { return '—'; }
 }

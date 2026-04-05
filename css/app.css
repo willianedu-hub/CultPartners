@@ -636,3 +636,17 @@ tbody tr.rej-row:hover .td-sticky { background:#ffe8e8; }
   #sidebar         { transform: translateX(-100%); }
   #sidebar.mobile-open { transform: none; }
 }
+/* ─── LOG DE ATIVIDADES ───────────────────────────── */
+.log-wrap { background:var(--surface); border:1.5px solid var(--border); border-radius:var(--r-lg); overflow:hidden; box-shadow:var(--shadow-sm); }
+.log-header { display:flex; align-items:center; justify-content:space-between; flex-wrap:wrap; gap:10px; padding:14px 18px; border-bottom:1.5px solid var(--border); background:var(--surface2); }
+.log-title { font-family:'Rajdhani',sans-serif; font-weight:700; font-size:18px; color:var(--text); }
+.log-filters { display:flex; gap:8px; flex-wrap:wrap; align-items:center; }
+#logPager { padding:4px 8px 6px; }
+.log-admin   td { background:#fdf4ff; }
+.log-partner td { background:#f8faff; }
+.log-admin:hover   td { background:#f5e8ff !important; }
+.log-partner:hover td { background:#eff4ff !important; }
+.log-badge { display:inline-block; padding:1px 8px; border-radius:20px; font-size:10px; font-weight:700; text-transform:uppercase; letter-spacing:.4px; }
+.log-ins { background:#ecfdf5; color:#059669; }
+.log-upd { background:#eff6ff; color:#1d4ed8; }
+.log-del { background:#fef2f2; color:#dc2626; }

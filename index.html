@@ -76,6 +76,7 @@
             <div class="um-drop-role" id="umDropRole">Administrador</div>
           </div>
           <div class="um-drop-item" onclick="nav('configuracoes')" id="umCfg" style="display:none">⚙️ Configurações</div>
+          <div class="um-drop-item" onclick="openSenha()">🔑 Trocar Senha</div>
           <div class="um-drop-item red" onclick="doLogout()">⏻ Sair do Portal</div>
         </div>
       </div>
@@ -161,8 +162,10 @@
         <div class="cfg-block" onclick="openCad('status')">   <div class="cfg-icon">🏷️</div><div class="cfg-title">Status do Funil</div>  <div class="cfg-sub">Gerencie as etapas do pipeline</div></div>
         <div class="cfg-block" onclick="openCad('parceiros')"><div class="cfg-icon">🤝</div><div class="cfg-title">Parceiros</div>        <div class="cfg-sub">Cadastre e edite parceiros e acessos</div></div>
         <div class="cfg-block" onclick="openCad('produtos')"> <div class="cfg-icon">📦</div><div class="cfg-title">Produtos / Serviços</div><div class="cfg-sub">Gerencie o catálogo de ofertas</div></div>
+        <div class="cfg-block" onclick="openLogs()">          <div class="cfg-icon">🗂️</div><div class="cfg-title">Log de Atividades</div><div class="cfg-sub">Auditoria de ações no sistema</div></div>
       </div>
-      <div class="alert alert-info" style="max-width:600px">Selecione uma opção acima para gerenciar as configurações do sistema.</div>
+      <div id="logsSection" style="display:none;margin-top:8px"></div>
+      <div class="alert alert-info" style="max-width:600px" id="cfgHint">Selecione uma opção acima para gerenciar as configurações do sistema.</div>
     </div>
 
   </div><!-- /main-inner -->
@@ -234,6 +237,35 @@
         <table><thead id="drillHead"></thead><tbody id="drillBody"></tbody></table>
       </div></div>
       <div id="drillPager"></div>
+    </div>
+  </div>
+</div>
+
+<!-- MODAL: TROCAR SENHA -->
+<div class="m-overlay" id="mSenha">
+  <div class="m-box" style="max-width:420px">
+    <div class="m-head">
+      <div class="m-title">🔑 Trocar Senha</div>
+      <button class="m-close" onclick="closeM('mSenha')">✕</button>
+    </div>
+    <div class="m-body">
+      <div class="fg">
+        <label class="fl">Senha Atual *</label>
+        <input class="fc" id="sAtual" type="password" placeholder="Digite sua senha atual">
+      </div>
+      <div class="fg">
+        <label class="fl">Nova Senha *</label>
+        <input class="fc" id="sNova" type="password" placeholder="Mínimo 8 caracteres" oninput="checkSenhaStr()">
+        <div id="senhaStr" style="margin-top:6px;font-size:12px;display:flex;flex-wrap:wrap;gap:4px"></div>
+      </div>
+      <div class="fg" style="margin-bottom:0">
+        <label class="fl">Confirmar Nova Senha *</label>
+        <input class="fc" id="sConf" type="password" placeholder="Repita a nova senha">
+      </div>
+    </div>
+    <div class="m-foot">
+      <button class="btn btn-ghost" onclick="closeM('mSenha')">Cancelar</button>
+      <button class="btn btn-brand" onclick="saveSenha()">💾 Salvar Senha</button>
     </div>
   </div>
 </div>

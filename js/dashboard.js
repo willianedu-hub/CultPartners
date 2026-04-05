@@ -223,15 +223,19 @@ function _svgText(svg, x, y, txt, fill, size, family, weight) {
 
 // ── Drill-down (shared) ──────────────────────────────────────
 function drill(title, list) {
-  const safe  = list || [];
-  const cols  = ['empresa','cnpj','contato','produto','status','fechamento','parceiro','aprovacao'];
-  const label = { empresa:'Empresa',cnpj:'CNPJ',contato:'Contato',produto:'Produto',status:'Etapa',fechamento:'Fechamento',parceiro:'Parceiro',aprovacao:'Aprovação' };
+  const safe    = list || [];
+  const isAdmin = APP.cu.role === 'admin';
+  const cols    = ['empresa','cnpj','contato','produto','status','fechamento','parceiro','aprovacao'];
+  const label   = { empresa:'Empresa',cnpj:'CNPJ',contato:'Contato',produto:'Produto',status:'Etapa',fechamento:'Fechamento',parceiro:'Parceiro',aprovacao:'Aprovação' };
   let _page = 0;
   let _ps   = APP.tPageSize;
 
-  g('drillHead').innerHTML = `<tr>${cols.map(c => `<th>${label[c]}</th>`).join('')}</tr>`;
+  g('drillHead').innerHTML = `<tr>
+    ${cols.map(c => `<th>${label[c]}</th>`).join('')}
+    ${isAdmin ? '<th style="width:160px">Ações</th>' : ''}
+  </tr>`;
 
-  window._drillGoPage = function(n) { _page = n; _render(); };
+  window._drillGoPage  = function(n) { _page = n; _render(); };
   window._drillSetSize = function(n) { _ps = n; _page = 0; _render(); };
 
   function _render() {
@@ -241,6 +245,24 @@ function drill(title, list) {
     g('drillBody').innerHTML = safe.slice(start, start + _ps).map(o => {
       const par = APP.partners.find(p => p.id === o.parceiro_id) || { nome: '—', site: null };
       const rej = o.aprovacao === 'Rejeitado';
+      const pnd = o.aprovacao === 'Pendente';
+
+      let actionCell = '';
+      if (isAdmin) {
+        if (pnd) {
+          actionCell = `<td>
+            <div style="display:flex;gap:4px">
+              <button class="btn btn-ok btn-xs"  onclick="approveOp(${o.id})" title="Aprovar">✅ Aprovar</button>
+              <button class="btn btn-bad btn-xs" onclick="openReject(${o.id})" title="Rejeitar">❌ Rejeitar</button>
+            </div>
+          </td>`;
+        } else if (rej) {
+          actionCell = `<td><button class="btn btn-ok btn-xs" onclick="approveOp(${o.id})" title="Reverter">↩ Reverter</button></td>`;
+        } else {
+          actionCell = `<td><button class="btn btn-ghost btn-xs" onclick="editOp(${o.id});closeM('mDrill')">✏️ Ver</button></td>`;
+        }
+      }
+
       return `<tr class="${rej ? 'rej-row' : ''}">
         <td class="td-main"><span class="ename">${logoImg(o.site_empresa, o.empresa)}${esc(o.empresa)}${rej ? ' 🚫' : ''}</span></td>
         <td>${esc(o.cnpj || '—')}</td>
@@ -250,6 +272,7 @@ function drill(title, list) {
         <td>${fmtMonth(o.fechamento)}</td>
         <td><span class="ename">${logoImg(par.site, par.nome)}${esc(par.nome)}</span></td>
         <td><span class="badge ${badgeCls(o.aprovacao)}">${esc(o.aprovacao)}</span></td>
+        ${actionCell}
       </tr>`;
     }).join('');
     g('drillPager').innerHTML = buildPagerHTML(total, _page, _ps, '_drillGoPage', '_drillSetSize');
