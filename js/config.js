@@ -4,8 +4,8 @@
 //  Supabase → Project Settings → API
 // ============================================================
 
-const SUPABASE_URL  = 'SUPABASE_URL_AQUI';
-const SUPABASE_ANON = 'SUPABASE_ANON_KEY_AQUI';
+const SUPABASE_URL  = 'https://jtdrnjlbnchsvjxuifku.supabase.co';
+const SUPABASE_ANON = 'sb_publishable_fTzo-xYRLF5ODTfGiMPPUA_nITIkhdE';
 
 // Cliente global — usado por todos os módulos
 const sb = supabase.createClient(SUPABASE_URL, SUPABASE_ANON);
