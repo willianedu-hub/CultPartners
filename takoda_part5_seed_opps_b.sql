@@ -30,7 +30,7 @@ VALUES
 
 -- Logicalis (mais) ---------------------------------------------
 ('Hospital Sírio-Libanês',     '61.590.410/0001-44', 'hospitalsiriolibanes.com.br','Adriane Costa','Head de TI',             'Colocation para prontuário eletrônico e PACS',                 2, 6, '2025-03-01', 4, 'Aprovado', 1, now() - interval '112 days'),
-('Rede D\'Or São Luiz',        '06.047.087/0001-39', 'rededorsaoluiz.com.br', 'Thiago Braga',       'CIO',                    'DR para sistema de gestão hospitalar integrado',               8, 5, '2025-07-01', 4, 'Aprovado', 1, now() - interval '30 days'),
+('Rede D''Or São Luiz',        '06.047.087/0001-39', 'rededorsaoluiz.com.br', 'Thiago Braga',       'CIO',                    'DR para sistema de gestão hospitalar integrado',               8, 5, '2025-07-01', 4, 'Aprovado', 1, now() - interval '30 days'),
 ('Hermes Pardini',             '19.378.769/0001-76', 'hermespardini.com.br',  'Erika Sousa',        'Gerente de Infra',       'Cloud connect para laudos em nuvem',                           5, 4, '2025-08-01', 4, 'Aprovado', 1, now() - interval '14 days'),
 ('Grupo Fleury',               '29.979.036/0001-02', 'grupofleury.com.br',    'Luciana Viotti',     'Diretora de TI',         'NaaS para clínicas e laboratórios afiliados',                  7, 3, '2025-09-01', 4, 'Pendente', null, null),
 ('Oncoclínicas do Brasil',     '22.225.820/0001-83', 'oncoclínicas.com.br',  'Pedro Salles',       'Arquiteto de TI',        'Rack energizado para sistemas de radioterapia',                3, 2, '2025-10-01', 4, 'Pendente', null, null),
@@ -67,7 +67,7 @@ VALUES
 ('Grupo Zaffari',              '93.209.765/0001-55', 'zaffari.com.br',        'Cristiano Pompeu',   'Gerente de TI',          'Colocation para sistemas de supermercado e conveniência',      1, 6, '2025-03-01', 9, 'Aprovado', 1, now() - interval '120 days'),
 ('Assaí Atacadista',           '06.057.223/0001-71', 'assai.com.br',          'Letícia Mota',       'Head de TI',             'DR para sistemas de atacado e PDV',                            8, 5, '2025-07-01', 9, 'Aprovado', 1, now() - interval '34 days'),
 ('Atacadão S.A.',              '75.315.333/0001-09', 'atacadao.com.br',       'Rodrigo Alves',      'IT Manager',             'NaaS para conectar 300+ lojas no Brasil',                      7, 4, '2025-08-01', 9, 'Aprovado', 1, now() - interval '21 days'),
-('Sam\'s Club Brasil',         '59.761.016/0001-88', 'samsclub.com.br',       'Fernanda Coutinho',  'Gerente de Infra',       'Cloud connect para plataforma omnichannel',                    5, 3, '2025-09-01', 9, 'Pendente', null, null),
+('Sam''s Club Brasil',         '59.761.016/0001-88', 'samsclub.com.br',       'Fernanda Coutinho',  'Gerente de Infra',       'Cloud connect para plataforma omnichannel',                    5, 3, '2025-09-01', 9, 'Pendente', null, null),
 ('Hortifruti Natural da Terra','35.785.420/0001-86', 'hfnatural.com.br',      'Jonas Rezende',      'CTO',                    'Rack energizado para ERP e sistemas de estoque',               3, 2, '2025-10-01', 9, 'Pendente', null, null),
 
 -- Claro (mais) -------------------------------------------------
