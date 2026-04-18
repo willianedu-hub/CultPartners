@@ -4,8 +4,8 @@
 //  Supabase → Project Settings → API
 // ============================================================
 
-const SUPABASE_URL  = 'https://kjzpjuxekzhjoyernxuv.supabase.co';
-const SUPABASE_ANON = 'sb_publishable_p_H6fbhHXM9JYzG5vROAKA_jMDIpWYF';
+const SUPABASE_URL  = 'SUPABASE_URL_AQUI';
+const SUPABASE_ANON = 'SUPABASE_ANON_KEY_AQUI';
 
 // Cliente global — usado por todos os módulos
 const sb = supabase.createClient(SUPABASE_URL, SUPABASE_ANON);
@@ -25,10 +25,10 @@ const ALL_COLS = [
   { k: 'acoes',      l: 'Ações',      req: true  },
 ];
 
-// Paleta de cores dos gráficos
+// Paleta de cores dos gráficos — Takoda orange/gold
 const CHART_FILLS = [
-  '#7c3aed', '#c026d3', '#059669',
-  '#d97706', '#0ea5e9', '#6d28d9', '#a21caf'
+  '#E85D1A', '#F5A623', '#C4440D',
+  '#059669', '#0ea5e9', '#d97706', '#a16207'
 ];
 
 // Estado global da aplicação (único lugar onde o estado vive)
