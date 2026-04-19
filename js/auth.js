@@ -102,7 +102,7 @@ function startApp() {
   ['umAv', 'umDropAv'].forEach(id => { const el = g(id); if (el) el.textContent = ini; });
   if (g('umName'))     g('umName').textContent     = name;
   if (g('umDropName')) g('umDropName').textContent = name;
-  if (g('umDropRole')) g('umDropRole').textContent = role === 'admin' ? 'Admin CULTSEC' : 'Parceiro';
+  if (g('umDropRole')) g('umDropRole').textContent = role === 'admin' ? 'Admin Takoda' : 'Parceiro';
 
   const isAdmin = role === 'admin';
   ['adSep', 'adLbl', 'navCfg', 'umCfg'].forEach(id => {

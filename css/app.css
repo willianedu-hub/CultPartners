@@ -98,7 +98,7 @@ input, select, textarea { font-family:inherit; }
 }
 .login-box { width:420px; max-width:95vw; }
 .login-header { text-align:center; margin-bottom:32px; }
-.login-logo { width:88px; height:88px; border-radius:18px; margin:0 auto 18px; display:block; object-fit:cover; box-shadow:0 0 50px rgba(232,93,26,.45), 0 0 20px rgba(245,166,35,.3); }
+.login-logo { width:160px; height:auto; border-radius:12px; margin:0 auto 18px; display:block; object-fit:contain; }
 .login-brand { font-family:'Rajdhani',sans-serif; font-weight:700; font-size:26px; letter-spacing:1px; color:#fff; }
 .login-brand em { background:var(--gradient); -webkit-background-clip:text; -webkit-text-fill-color:transparent; font-style:normal; }
 .login-tagline { font-size:11px; color:rgba(255,255,255,.3); letter-spacing:3px; text-transform:uppercase; margin-top:5px; }
@@ -167,7 +167,7 @@ textarea.fc { resize:vertical; min-height:70px; line-height:1.5; }
   border-bottom:1px solid var(--sidebar-border);
   position:relative;
 }
-.sb-logo { width:30px; height:30px; border-radius:7px; object-fit:cover; flex-shrink:0; }
+.sb-logo { width:36px; height:36px; border-radius:7px; object-fit:contain; flex-shrink:0; }
 .sb-brand {
   font-family:'Rajdhani',sans-serif; font-weight:700; font-size:16px;
   color:#fff; letter-spacing:.5px; white-space:nowrap; overflow:hidden;
