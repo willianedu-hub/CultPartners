@@ -11,6 +11,7 @@ const VIEW_TITLES = {
 };
 
 async function nav(page) {
+  closeMobileSidebar();
   // Troca view ativa
   qsa('.view').forEach(v => v.classList.remove('active'));
   const view = g('v-' + page);

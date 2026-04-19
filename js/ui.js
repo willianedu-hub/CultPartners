@@ -165,6 +165,15 @@ function toggleSidebar() {
   g('sbBtn').textContent = _sbColl ? '▶' : '◀';
 }
 
+function toggleMobileSidebar() {
+  g('sidebar').classList.toggle('mobile-open');
+  g('sidebarOverlay').classList.toggle('active');
+}
+function closeMobileSidebar() {
+  g('sidebar').classList.remove('mobile-open');
+  g('sidebarOverlay').classList.remove('active');
+}
+
 // ── User menu toggle ─────────────────────────────────────────
 function toggleUM() {
   g('umDrop').classList.toggle('open');

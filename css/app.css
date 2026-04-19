@@ -627,14 +627,25 @@ tbody tr.rej-row:hover .td-sticky { background:#ffe8e8; }
   color: var(--text); margin-bottom: 14px;
 }
 /* Responsive */
+.hamburger-btn { display:none; }
+#sidebarOverlay { display:none; position:fixed; inset:0; background:rgba(0,0,0,.45); z-index:149; }
+#sidebarOverlay.active { display:block; }
+
 @media(max-width:768px) {
   .stats-grid      { grid-template-columns: repeat(2,1fr); }
   .cfg-blocks      { grid-template-columns: 1fr 1fr; }
   .rep-stats       { grid-template-columns: 1fr; }
   .charts-grid     { grid-template-columns: 1fr; }
   #main            { margin-left: 0 !important; }
-  #sidebar         { transform: translateX(-100%); }
+  #topbar          { left: 0 !important; }
+  #sidebar         { transform: translateX(-100%); transition: transform .25s ease; z-index:150; }
   #sidebar.mobile-open { transform: none; }
+  .sb-collapse-btn { display: none; }
+  .hamburger-btn   {
+    display:flex; align-items:center; justify-content:center;
+    background:none; border:none; color:var(--text); font-size:22px;
+    cursor:pointer; padding:4px 10px 4px 0; flex-shrink:0;
+  }
 }
 /* ─── LOG DE ATIVIDADES ───────────────────────────── */
 .log-wrap { background:var(--surface); border:1.5px solid var(--border); border-radius:var(--r-lg); overflow:hidden; box-shadow:var(--shadow-sm); }
