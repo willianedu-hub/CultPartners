@@ -187,8 +187,13 @@ function renderTable() {
           return `<td>${esc(o.contato || '')}${o.cargo ? `<br><span style="font-size:10px;color:var(--text3)">${esc(o.cargo)}</span>` : ''}</td>`;
         case 'cargo':
           return `<td>${esc(o.cargo || '—')}</td>`;
-        case 'produto':
-          return `<td><span style="background:var(--primary-light);color:var(--primary);padding:2px 8px;border-radius:4px;font-size:11px;font-weight:600">${esc(o.produto || '')}</span></td>`;
+        case 'produto': {
+          const pnames = (o.produtos_nomes || o.produto || '').split(', ');
+          const tags   = pnames.filter(Boolean).map(n =>
+            `<span style="background:var(--primary-light);color:var(--primary);padding:2px 7px;border-radius:4px;font-size:10px;font-weight:600;white-space:nowrap">${esc(n)}</span>`
+          ).join(' ');
+          return `<td><div style="display:flex;flex-wrap:wrap;gap:3px">${tags || '—'}</div></td>`;
+        }
         case 'status':
           return `<td><span class="badge ${badgeCls(o.status)}">
             <span class="bdot" style="background:${esc(o.status_cor || '#64748b')}"></span>${esc(o.status)}

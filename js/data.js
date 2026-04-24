@@ -52,6 +52,7 @@ const DB = {
       .from('produtos')
       .select('*')
       .eq('ativo', true)
+      .order('ordem')
       .order('nome');
     if (error) throw error;
     return data || [];
@@ -68,23 +69,35 @@ const DB = {
     if (parceiroId) q = q.eq('parceiro_id', parceiroId);
     const { data, error } = await q;
     if (error) throw error;
-    // Carrega tarefas de cada oportunidade
+
     const ids = (data || []).map(o => o.id);
     let tarefas = [];
+    let oppProds = [];
+
     if (ids.length) {
-      const { data: td, error: te } = await sb
-        .from('tarefas')
-        .select('*')
-        .in('oportunidade_id', ids)
-        .order('created_at');
+      const [{ data: td, error: te }, { data: pd }] = await Promise.all([
+        sb.from('tarefas').select('*').in('oportunidade_id', ids).order('created_at'),
+        sb.from('oportunidade_produtos').select('oportunidade_id, produto_id').in('oportunidade_id', ids),
+      ]);
       if (te) throw te;
-      tarefas = td || [];
+      tarefas  = td || [];
+      oppProds = pd || [];
     }
-    // Injeta tarefas em cada oportunidade
-    return (data || []).map(o => ({
-      ...o,
-      tarefas: tarefas.filter(t => t.oportunidade_id === o.id),
-    }));
+
+    return (data || []).map(o => {
+      const prodIds = oppProds
+        .filter(op => op.oportunidade_id === o.id)
+        .map(op => op.produto_id);
+      const prodNames = prodIds.length
+        ? prodIds.map(id => APP.products.find(p => p.id === id)?.nome).filter(Boolean).join(', ')
+        : (o.produto || '');
+      return {
+        ...o,
+        tarefas:        tarefas.filter(t => t.oportunidade_id === o.id),
+        produtos_ids:   prodIds.length ? prodIds : (o.produto_id ? [o.produto_id] : []),
+        produtos_nomes: prodNames,
+      };
+    });
   },
 
   async createOpp(payload) {
@@ -140,6 +153,17 @@ const DB = {
       p_usuario: usuario,
     });
     if (error) throw error;
+  },
+
+  // Salva produtos da oportunidade (junction N:N)
+  async saveOppProducts(oppId, productIds) {
+    await sb.from('oportunidade_produtos').delete().eq('oportunidade_id', oppId);
+    if (productIds.length) {
+      const { error } = await sb.from('oportunidade_produtos').insert(
+        productIds.map(pid => ({ oportunidade_id: oppId, produto_id: pid }))
+      );
+      if (error) throw error;
+    }
   },
 
   // Move status no kanban

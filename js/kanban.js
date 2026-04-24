@@ -61,7 +61,7 @@ function _buildCard(o, st) {
   card.innerHTML = `
     <div class="k-company">${logoImg(o.site_empresa, o.empresa)}${esc(o.empresa)}${rej ? ' 🚫' : ''}</div>
     <div class="k-partner">${logoImg(par.site, par.nome)}${esc(par.nome)}</div>
-    <span class="k-product">${esc(o.produto || '')}</span>
+    <span class="k-product">${esc(o.produtos_nomes || o.produto || '')}</span>
     <div class="k-meta">
       ${o.fechamento ? `<span>📅 ${fmtMonth(o.fechamento)}</span>` : ''}
       ${pend         ? `<span>📋 ${pend}</span>`                    : ''}

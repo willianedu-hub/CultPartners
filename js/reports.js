@@ -45,12 +45,13 @@ function _renderRepStats(ops, gnh, perd, taxa) {
 function _renderProductBar(ops) {
   const el = g('barProd');
   el.innerHTML = '';
-  const pc = {};
-  APP.products.forEach(p => { pc[p.nome] = ops.filter(o => o.produto === p.nome).length; });
-  const sorted = Object.entries(pc).sort((a, b) => b[1] - a[1]);
-  const max = sorted[0]?.[1] || 1;
+  const sorted = APP.products
+    .map(p => ({ id: p.id, nome: p.nome, v: ops.filter(o => (o.produtos_ids || []).includes(p.id)).length }))
+    .filter(p => p.v > 0)
+    .sort((a, b) => b.v - a.v);
+  const max = sorted[0]?.v || 1;
 
-  sorted.forEach(([nome, v], i) => {
+  sorted.forEach(({ id: pid, nome, v }, i) => {
     const row = document.createElement('div');
     row.className    = 'bar-row';
     row.style.cursor = 'pointer';
@@ -58,7 +59,7 @@ function _renderProductBar(ops) {
       <div class="bar-lbl">${esc(nome)}</div>
       <div class="bar-track"><div class="bar-fill" style="width:${v / max * 100}%;background:${CHART_FILLS[i % CHART_FILLS.length]}"></div></div>
       <div class="bar-num">${v}</div>`;
-    row.addEventListener('click', () => drill('Produto: ' + nome, ops.filter(o => o.produto === nome)));
+    row.addEventListener('click', () => drill('Produto: ' + nome, ops.filter(o => (o.produtos_ids || []).includes(pid))));
     el.appendChild(row);
   });
 }
@@ -88,19 +89,21 @@ function _renderConversionBar(ops) {
   } else {
     g('repConvTitle').textContent = 'Minha Conversão por Produto';
     g('repConvSub').textContent   = '% ganhos por produto — clique para detalhar';
-    const prods = [...new Set(ops.map(o => o.produto).filter(Boolean))];
-    prods.forEach((nome, i) => {
-      const total  = ops.filter(o => o.produto === nome).length;
-      const ganhos = ops.filter(o => o.produto === nome && o.status === 'Ganho').length;
+    const activeProds = APP.products.filter(p =>
+      ops.some(o => (o.produtos_ids || []).includes(p.id))
+    );
+    activeProds.forEach((p, i) => {
+      const total  = ops.filter(o => (o.produtos_ids || []).includes(p.id)).length;
+      const ganhos = ops.filter(o => (o.produtos_ids || []).includes(p.id) && o.status === 'Ganho').length;
       const pct    = total ? Math.round(ganhos / total * 100) : 0;
       const row    = document.createElement('div');
       row.className    = 'bar-row';
       row.style.cursor = 'pointer';
       row.innerHTML = `
-        <div class="bar-lbl" style="max-width:130px;overflow:hidden;text-overflow:ellipsis">${esc(nome)}</div>
+        <div class="bar-lbl" style="max-width:130px;overflow:hidden;text-overflow:ellipsis">${esc(p.nome)}</div>
         <div class="bar-track"><div class="bar-fill" style="width:${pct}%;background:${CHART_FILLS[i % CHART_FILLS.length]}"></div></div>
         <div class="bar-num">${pct}%</div>`;
-      row.addEventListener('click', () => drill('Produto: ' + nome, ops.filter(o => o.produto === nome)));
+      row.addEventListener('click', () => drill('Produto: ' + p.nome, ops.filter(o => (o.produtos_ids || []).includes(p.id))));
       el.appendChild(row);
     });
   }

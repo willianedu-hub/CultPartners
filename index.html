@@ -185,7 +185,16 @@
         <div class="fg fg-full"><label class="fl">Site da Empresa</label><input class="fc" id="fSiteEmp" placeholder="https://empresa.com.br"></div>
         <div class="fg"><label class="fl">Contato *</label><input class="fc" id="fCont"    placeholder="Nome do contato"></div>
         <div class="fg"><label class="fl">Cargo</label>    <input class="fc" id="fCargo"   placeholder="Diretor, Gerente…"></div>
-        <div class="fg"><label class="fl">Produto / Serviço *</label><select class="fc" id="fProd"></select></div>
+        <div class="fg fg-full">
+          <label class="fl">Produto(s) / Serviço(s) *</label>
+          <div class="prod-picker-wrap" id="prodPickerWrap">
+            <div class="prod-picker-trigger" id="prodPickerTrigger" onclick="toggleProdPicker()">
+              <span id="prodPickerLabel"><span class="prod-picker-placeholder">Selecione produtos/serviços...</span></span>
+              <span class="prod-picker-arrow">▾</span>
+            </div>
+            <div class="prod-picker-drop" id="prodPickerDrop"></div>
+          </div>
+        </div>
         <div class="fg"><label class="fl">Etapa do Funil *</label>   <select class="fc" id="fStOp"></select></div>
         <div class="fg"><label class="fl">Previsão de Fechamento</label><input class="fc" id="fFech" type="month"></div>
         <div class="fg" id="fParWrap"><label class="fl">Parceiro</label><select class="fc" id="fParOp"></select></div>

@@ -60,7 +60,7 @@ function _renderAlerts(ops) {
     return `<tr class="alr-row ${cls}" onclick="editOp(${o.id})" title="Clique para editar">
       <td><span class="ename">${logoImg(o.site_empresa, o.empresa)}${esc(o.empresa)}</span></td>
       <td><span class="ename">${logoImg(par.site, par.nome)}${esc(par.nome)}</span></td>
-      <td>${esc(o.produto || '—')}</td>
+      <td>${esc(o.produtos_nomes || o.produto || '—')}</td>
       <td><span class="badge ${badgeCls(o.status)}">${esc(o.status)}</span></td>
       <td>${fmtDate(o.approved_at)}</td>
       <td><span class="dias-badge">${dias}d</span></td>
@@ -168,12 +168,12 @@ function _renderBarPartner(ops) {
   } else {
     g('scardBarTitle').textContent = 'Meus Resultados por Produto';
     g('scardBarSub').textContent   = 'Clique para detalhar';
-    const prods = [...new Set(ops.map(o => o.produto).filter(Boolean))];
-    const sorted = prods
-      .map(nome => ({ nome, v: ops.filter(o => o.produto === nome).length }))
+    const sorted = APP.products
+      .map(p => ({ id: p.id, nome: p.nome, v: ops.filter(o => (o.produtos_ids || []).includes(p.id)).length }))
+      .filter(p => p.v > 0)
       .sort((a, b) => b.v - a.v);
     const max = Math.max(...sorted.map(p => p.v), 1);
-    sorted.forEach(({ nome, v }, i) => {
+    sorted.forEach(({ id: pid, nome, v }, i) => {
       const row = document.createElement('div');
       row.className = 'bar-row';
       row.innerHTML = `
@@ -181,7 +181,7 @@ function _renderBarPartner(ops) {
         <div class="bar-track"><div class="bar-fill" style="width:${v / max * 100}%;background:${CHART_FILLS[i % CHART_FILLS.length]}"></div></div>
         <div class="bar-num">${v}</div>`;
       row.style.cursor = 'pointer';
-      row.addEventListener('click', () => drill('Produto: ' + nome, ops.filter(o => o.produto === nome)));
+      row.addEventListener('click', () => drill('Produto: ' + nome, ops.filter(o => (o.produtos_ids || []).includes(pid))));
       el.appendChild(row);
     });
   }
@@ -291,7 +291,7 @@ function drill(title, list) {
         <td class="td-main"><span class="ename">${logoImg(o.site_empresa, o.empresa)}${esc(o.empresa)}${rej ? ' 🚫' : ''}</span></td>
         <td>${esc(o.cnpj || '—')}</td>
         <td>${esc(o.contato || '')}</td>
-        <td>${esc(o.produto || '')}</td>
+        <td>${esc(o.produtos_nomes || o.produto || '')}</td>
         <td><span class="badge ${badgeCls(o.status)}">${esc(o.status)}</span></td>
         <td>${fmtMonth(o.fechamento)}</td>
         <td><span class="ename">${logoImg(par.site, par.nome)}${esc(par.nome)}</span></td>

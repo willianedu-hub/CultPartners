@@ -26,8 +26,7 @@ function checkDupe() {
 
 // ── Selects do modal ─────────────────────────────────────────
 function _popSelects() {
-  g('fProd').innerHTML = '<option value="">Selecione...</option>' +
-    APP.products.map(p => `<option value="${p.id}">${esc(p.nome)}</option>`).join('');
+  _buildProdPicker();
 
   g('fStOp').innerHTML = APP.statusList
     .slice().sort((a, b) => a.ordem - b.ordem)
@@ -35,6 +34,84 @@ function _popSelects() {
 
   g('fParOp').innerHTML = APP.partners
     .map(p => `<option value="${p.id}">${esc(p.nome)}</option>`).join('');
+}
+
+// ── Product picker ────────────────────────────────────────────
+function _buildProdPicker() {
+  const drop = g('prodPickerDrop');
+  if (!drop) return;
+  const cats = {};
+  const catOrder = [];
+  APP.products.forEach(p => {
+    const cat = p.categoria || 'Outros';
+    if (!cats[cat]) { cats[cat] = []; catOrder.push(cat); }
+    cats[cat].push(p);
+  });
+  drop.innerHTML = catOrder.map(cat => {
+    const prods = cats[cat];
+    return `<div class="prod-cat-group">
+      <div class="prod-cat-head" onclick="toggleProdCat(this)">
+        <span class="prod-cat-arrow">▶</span>
+        <span>${esc(cat)}</span>
+        <span class="prod-cat-cnt">${prods.length}</span>
+      </div>
+      <div class="prod-cat-items" style="display:none">
+        ${prods.map(p => `<label class="prod-item">
+          <input type="checkbox" value="${p.id}" onchange="_updateProdLabel()">
+          <span>${esc(p.nome)}</span>
+        </label>`).join('')}
+      </div>
+    </div>`;
+  }).join('');
+  _updateProdLabel();
+}
+
+function toggleProdPicker() {
+  g('prodPickerDrop')?.classList.toggle('open');
+}
+
+function toggleProdCat(head) {
+  head.classList.toggle('open');
+  const items = head.nextElementSibling;
+  if (items) items.style.display = head.classList.contains('open') ? '' : 'none';
+}
+
+function _updateProdLabel() {
+  const ids   = _getSelectedProdIds();
+  const label = g('prodPickerLabel');
+  if (!label) return;
+  if (!ids.length) {
+    label.innerHTML = '<span class="prod-picker-placeholder">Selecione produtos/serviços...</span>';
+    return;
+  }
+  const names = ids.map(id => APP.products.find(p => p.id === id)?.nome).filter(Boolean);
+  label.innerHTML = names.map(n => `<span class="prod-tag">${esc(n)}</span>`).join('');
+}
+
+function _getSelectedProdIds() {
+  const checks = g('prodPickerDrop')?.querySelectorAll('input[type=checkbox]:checked') || [];
+  return Array.from(checks).map(c => +c.value);
+}
+
+function _setSelectedProdIds(ids) {
+  const drop = g('prodPickerDrop');
+  if (!drop) return;
+  drop.querySelectorAll('input[type=checkbox]').forEach(c => {
+    c.checked = ids.includes(+c.value);
+  });
+  drop.querySelectorAll('.prod-cat-head').forEach(head => {
+    const items = head.nextElementSibling;
+    if (items?.querySelector('input:checked')) {
+      head.classList.add('open');
+      items.style.display = '';
+    }
+  });
+  _updateProdLabel();
+}
+
+function _clearSelectedProds() {
+  g('prodPickerDrop')?.querySelectorAll('input[type=checkbox]').forEach(c => { c.checked = false; });
+  _updateProdLabel();
 }
 
 // ── Abrir modal — nova oportunidade ─────────────────────────
@@ -46,7 +123,7 @@ function openOpModal() {
   ['fEmp','fCnpj','fSiteEmp','fCont','fCargo','fObs'].forEach(id => {
     const el = g(id); if (el) el.value = '';
   });
-  g('fProd').value  = '';
+  _clearSelectedProds();
   g('fFech').value  = '';
   g('dupeBox').style.display     = 'none';
   g('mOpApprBar').style.display  = 'none';
@@ -71,7 +148,7 @@ function editOp(id) {
   g('fSiteEmp').value = o.site_empresa  || '';
   g('fCont').value    = o.contato       || '';
   g('fCargo').value   = o.cargo         || '';
-  g('fProd').value    = o.produto_id    || '';
+  _setSelectedProdIds(o.produtos_ids || (o.produto_id ? [o.produto_id] : []));
   g('fStOp').value    = o.status_id     || '';
   g('fFech').value    = dateToMonth(o.fechamento);
   g('fObs').value     = o.obs           || '';
@@ -124,11 +201,11 @@ async function saveOp() {
   if (g('dupeBox').style.display !== 'none') {
     toast('Resolva a duplicata antes de salvar.', 'warn'); return;
   }
-  const emp  = g('fEmp').value.trim();
-  const cont = g('fCont').value.trim();
-  const prod = g('fProd').value;
-  const stOp = g('fStOp').value;
-  if (!emp || !cont || !prod || !stOp) {
+  const emp     = g('fEmp').value.trim();
+  const cont    = g('fCont').value.trim();
+  const prodIds = _getSelectedProdIds();
+  const stOp    = g('fStOp').value;
+  if (!emp || !cont || !prodIds.length || !stOp) {
     toast('⚠️ Preencha os campos obrigatórios!', 'warn'); return;
   }
 
@@ -138,7 +215,7 @@ async function saveOp() {
     site_empresa:g('fSiteEmp').value || null,
     contato:     cont,
     cargo:       g('fCargo').value   || null,
-    produto_id:  +prod,
+    produto_id:  prodIds[0],
     status_id:   +stOp,
     fechamento:  monthToDate(g('fFech').value),
     parceiro_id: APP.cu.role === 'admin' ? +g('fParOp').value : APP.cu.pid,
@@ -149,10 +226,12 @@ async function saveOp() {
   try {
     if (APP.editId) {
       await DB.updateOpp(APP.editId, payload);
+      await DB.saveOppProducts(APP.editId, prodIds);
       await DB.saveTasks(APP.editId, APP.editTasks);
       toast('✅ Oportunidade atualizada!');
     } else {
       const created = await DB.createOpp({ ...payload, aprovacao: 'Pendente' });
+      await DB.saveOppProducts(created.id, prodIds);
       await DB.saveTasks(created.id, APP.editTasks);
       toast('✅ Registrada! Aguardando aprovação.');
     }

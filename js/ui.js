@@ -49,6 +49,8 @@ document.addEventListener('click', e => {
     g('umDrop')?.classList.remove('open');
   if (!e.target.closest('.col-picker-wrap'))
     g('colPicker')?.classList.remove('open');
+  if (!e.target.closest('#prodPickerWrap'))
+    g('prodPickerDrop')?.classList.remove('open');
 });
 
 // ── Badge CSS class ──────────────────────────────────────────
