@@ -209,29 +209,32 @@ async function saveOp() {
   const cont    = g('fCont').value.trim();
   const prodIds = _getSelectedProdIds();
   const stOp    = g('fStOp').value;
-  if (!emp || !cont || !prodIds.length || !stOp) {
+  if (!emp || !cont || !stOp) {
     toast('⚠️ Preencha os campos obrigatórios!', 'warn'); return;
+  }
+  if (!prodIds.length && !APP.editId) {
+    toast('⚠️ Selecione pelo menos um produto/serviço!', 'warn'); return;
   }
 
   const payload = {
-    empresa:     emp,
-    cnpj:        g('fCnpj').value    || null,
-    site_empresa:g('fSiteEmp').value || null,
-    contato:     cont,
-    cargo:       g('fCargo').value   || null,
-    produto_id:       prodIds[0],
-    status_id:        +stOp,
-    fechamento:       monthToDate(g('fFech').value),
-    valor_estimado:   parseBRL(g('fValor').value),
-    parceiro_id: APP.cu.role === 'admin' ? +g('fParOp').value : APP.cu.pid,
-    obs:         g('fObs').value     || null,
+    empresa:        emp,
+    cnpj:           g('fCnpj').value    || null,
+    site_empresa:   g('fSiteEmp').value || null,
+    contato:        cont,
+    cargo:          g('fCargo').value   || null,
+    status_id:      +stOp,
+    fechamento:     monthToDate(g('fFech').value),
+    valor_estimado: parseBRL(g('fValor').value),
+    parceiro_id:    APP.cu.role === 'admin' ? +g('fParOp').value : APP.cu.pid,
+    obs:            g('fObs').value     || null,
   };
+  if (prodIds.length) payload.produto_id = prodIds[0];
 
   loadingShow(true);
   try {
     if (APP.editId) {
       await DB.updateOpp(APP.editId, payload);
-      await DB.saveOppProducts(APP.editId, prodIds);
+      if (prodIds.length) await DB.saveOppProducts(APP.editId, prodIds);
       await DB.saveTasks(APP.editId, APP.editTasks);
       toast('✅ Oportunidade atualizada!');
     } else {
