@@ -2,17 +2,18 @@
 --  Migration: Campo valor_estimado em oportunidades
 --  Executar no Supabase SQL Editor (Project: kjzpjuxekzhjoyernxuv)
 --
---  IMPORTANTE: Em PostgreSQL, views com SELECT * NÃO refletem
---  automaticamente colunas novas. Por isso este script também
---  recria a v_oportunidades incluindo valor_estimado.
+--  PASSO 1 — Adiciona coluna (rode este bloco primeiro):
 -- ============================================================
-
--- 1. Adiciona coluna na tabela base
 ALTER TABLE oportunidades ADD COLUMN IF NOT EXISTS valor_estimado NUMERIC(14,2);
 
--- 2. Recria a view para incluir valor_estimado
---    (necessário pois views não atualizam automaticamente)
-CREATE OR REPLACE VIEW v_oportunidades AS
+-- ============================================================
+--  PASSO 2 — Recria a view incluindo valor_estimado
+--  (CREATE OR REPLACE falha se a ordem de colunas mudou;
+--   DROP + CREATE é a forma correta)
+-- ============================================================
+DROP VIEW IF EXISTS v_oportunidades;
+
+CREATE VIEW v_oportunidades AS
 SELECT
   op.id,
   op.empresa,
