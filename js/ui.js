@@ -72,7 +72,7 @@ function logoUrl(site) {
   if (!site || !site.trim()) return null;
   try {
     const h = site.replace(/^https?:\/\//, '').replace(/\/.*/, '').replace(/^www\./, '');
-    return h ? `https://logo.clearbit.com/${h}` : null;
+    return h ? `https://www.google.com/s2/favicons?sz=32&domain=${h}` : null;
   } catch { return null; }
 }
 function logoImg(site, alt = '') {
