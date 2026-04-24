@@ -58,10 +58,18 @@ function _buildCard(o, st) {
   card.dataset.id = o.id;
   card.style.borderLeftColor = st.cor;
 
+  const prods = (o.produtos_nomes || o.produto || '').split(', ').filter(Boolean);
+  const visibleProds = prods.slice(0, 2);
+  const extra = prods.length - visibleProds.length;
+  const prodHTML = `<div class="k-prods" title="${esc(prods.join('\n'))}">
+    ${visibleProds.map(n => `<span class="k-prod-tag">${esc(n)}</span>`).join('')}
+    ${extra > 0 ? `<span class="k-prod-more">+${extra}</span>` : ''}
+  </div>`;
+
   card.innerHTML = `
     <div class="k-company">${logoImg(o.site_empresa, o.empresa)}${esc(o.empresa)}${rej ? ' 🚫' : ''}</div>
     <div class="k-partner">${logoImg(par.site, par.nome)}${esc(par.nome)}</div>
-    <span class="k-product">${esc(o.produtos_nomes || o.produto || '')}</span>
+    ${prodHTML}
     <div class="k-meta">
       ${o.fechamento ? `<span>📅 ${fmtMonth(o.fechamento)}</span>` : ''}
       ${pend         ? `<span>📋 ${pend}</span>`                    : ''}

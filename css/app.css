@@ -504,6 +504,9 @@ tbody tr.rej-row:hover .td-sticky { background:#ffe8e8; }
 .k-company { font-size:13px; font-weight:700; color:var(--text); margin-bottom:3px; display:flex; align-items:center; gap:5px; }
 .k-partner { font-size:11px; color:var(--text3); margin-bottom:7px; display:flex; align-items:center; gap:4px; }
 .k-product { font-size:10px; background:var(--primary-light); color:var(--primary); border-radius:4px; padding:2px 7px; display:inline-block; font-weight:600; }
+.k-prods { display:flex; flex-wrap:wrap; gap:3px; margin-bottom:2px; }
+.k-prod-tag { font-size:10px; background:var(--primary-light); color:var(--primary); border-radius:4px; padding:2px 6px; font-weight:600; max-width:160px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+.k-prod-more { font-size:10px; background:var(--surface3); color:var(--text3); border-radius:4px; padding:2px 6px; font-weight:600; }
 .k-meta { font-size:10px; color:var(--text3); margin-top:6px; display:flex; gap:6px; flex-wrap:wrap; align-items:center; }
 .k-warn { color:var(--yellow); font-size:10px; font-weight:700; margin-top:4px; }
 .k-empty { text-align:center; padding:24px 0; color:var(--text4); font-size:22px; }
