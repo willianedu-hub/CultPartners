@@ -60,7 +60,7 @@ function _renderAlerts(ops) {
     return `<tr class="alr-row ${cls}" onclick="editOp(${o.id})" title="Clique para editar">
       <td><span class="ename">${logoImg(o.site_empresa, o.empresa)}${esc(o.empresa)}</span></td>
       <td><span class="ename">${logoImg(par.site, par.nome)}${esc(par.nome)}</span></td>
-      <td>${esc(o.produtos_nomes || o.produto || '—')}</td>
+      <td>${prodTagsHtml(o.produtos_nomes || o.produto)}</td>
       <td><span class="badge ${badgeCls(o.status)}">${esc(o.status)}</span></td>
       <td>${fmtDate(o.approved_at)}</td>
       <td><span class="dias-badge">${dias}d</span></td>
@@ -291,7 +291,7 @@ function drill(title, list) {
         <td class="td-main"><span class="ename">${logoImg(o.site_empresa, o.empresa)}${esc(o.empresa)}${rej ? ' 🚫' : ''}</span></td>
         <td>${esc(o.cnpj || '—')}</td>
         <td>${esc(o.contato || '')}</td>
-        <td>${esc(o.produtos_nomes || o.produto || '')}</td>
+        <td>${prodTagsHtml(o.produtos_nomes || o.produto)}</td>
         <td><span class="badge ${badgeCls(o.status)}">${esc(o.status)}</span></td>
         <td>${fmtMonth(o.fechamento)}</td>
         <td><span class="ename">${logoImg(par.site, par.nome)}${esc(par.nome)}</span></td>

@@ -157,6 +157,18 @@ function esc(str) {
     .replace(/"/g, '&quot;');
 }
 
+// ── Product tags HTML (shared by dashboard alerts + drill) ───
+function prodTagsHtml(nomes, max = 2) {
+  const list = (nomes || '').split(', ').filter(Boolean);
+  if (!list.length) return '—';
+  const visible = list.slice(0, max);
+  const extra   = list.length - visible.length;
+  return `<div class="k-prods" title="${esc(list.join('\n'))}" style="flex-wrap:wrap">
+    ${visible.map(n => `<span class="k-prod-tag">${esc(n)}</span>`).join('')}
+    ${extra > 0 ? `<span class="k-prod-more">+${extra}</span>` : ''}
+  </div>`;
+}
+
 // ── Sidebar toggle ───────────────────────────────────────────
 let _sbColl = false;
 function toggleSidebar() {
