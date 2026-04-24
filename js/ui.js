@@ -83,6 +83,32 @@ function logoImg(site, alt = '') {
   return `<img class="elogo" src="${u}" alt="${alt}" onerror="this.style.display='none'">`;
 }
 
+// ── Formatadores monetários ───────────────────────────────────
+function fmtBRL(v) {
+  if (v == null || v === '' || isNaN(+v)) return '—';
+  return Number(v).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
+}
+
+function fmtBRLShort(v) {
+  if (v == null || v === '' || isNaN(+v)) return '—';
+  const n = +v;
+  if (n >= 1_000_000) return 'R$ ' + (n / 1_000_000).toLocaleString('pt-BR', { minimumFractionDigits: 1, maximumFractionDigits: 1 }) + 'M';
+  if (n >= 1_000)     return 'R$ ' + (n / 1_000).toLocaleString('pt-BR', { minimumFractionDigits: 0, maximumFractionDigits: 0 }) + 'K';
+  return fmtBRL(n);
+}
+
+function maskBRL(el) {
+  const digits = el.value.replace(/\D/g, '');
+  if (!digits) { el.value = ''; return; }
+  el.value = (parseInt(digits, 10) / 100).toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+}
+
+function parseBRL(str) {
+  if (!str || !str.trim()) return null;
+  const n = parseFloat(str.replace(/\./g, '').replace(',', '.'));
+  return isNaN(n) || n === 0 ? null : n;
+}
+
 // ── Formatadores ─────────────────────────────────────────────
 /**
  * Converte "2025-06-01" ou "2025-06" → "Jun/25"

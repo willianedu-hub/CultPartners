@@ -71,6 +71,7 @@ function _buildCard(o, st) {
     <div class="k-partner">${logoImg(par.site, par.nome)}${esc(par.nome)}</div>
     ${prodHTML}
     <div class="k-meta">
+      ${o.valor_estimado ? `<span style="color:var(--green);font-weight:700">${fmtBRLShort(o.valor_estimado)}</span>` : ''}
       ${o.fechamento ? `<span>📅 ${fmtMonth(o.fechamento)}</span>` : ''}
       ${pend         ? `<span>📋 ${pend}</span>`                    : ''}
       ${o.aprovacao === 'Pendente'

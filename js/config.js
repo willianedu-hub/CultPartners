@@ -19,6 +19,7 @@ const ALL_COLS = [
   { k: 'produto',    l: 'Produto',    req: false },
   { k: 'status',     l: 'Etapa',      req: false },
   { k: 'fechamento', l: 'Fechamento', req: false },
+  { k: 'valor',      l: 'Valor Est.', req: false },
   { k: 'parceiro',   l: 'Parceiro',   req: false },
   { k: 'aprovacao',  l: 'Aprovação',  req: false },
   { k: 'tarefas',    l: 'Tarefas',    req: false },

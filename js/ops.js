@@ -125,6 +125,7 @@ function openOpModal() {
   });
   _clearSelectedProds();
   g('fFech').value  = '';
+  g('fValor').value = '';
   g('dupeBox').style.display     = 'none';
   g('mOpApprBar').style.display  = 'none';
   g('mOpStatus').innerHTML       = '';
@@ -152,6 +153,9 @@ function editOp(id) {
   g('fStOp').value    = o.status_id     || '';
   g('fFech').value    = dateToMonth(o.fechamento);
   g('fObs').value     = o.obs           || '';
+  g('fValor').value   = o.valor_estimado
+    ? Number(o.valor_estimado).toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
+    : '';
   g('fParOp').value   = o.parceiro_id   || '';
   g('dupeBox').style.display  = 'none';
   g('fParWrap').style.display = APP.cu.role === 'admin' ? '' : 'none';
@@ -215,9 +219,10 @@ async function saveOp() {
     site_empresa:g('fSiteEmp').value || null,
     contato:     cont,
     cargo:       g('fCargo').value   || null,
-    produto_id:  prodIds[0],
-    status_id:   +stOp,
-    fechamento:  monthToDate(g('fFech').value),
+    produto_id:       prodIds[0],
+    status_id:        +stOp,
+    fechamento:       monthToDate(g('fFech').value),
+    valor_estimado:   parseBRL(g('fValor').value),
     parceiro_id: APP.cu.role === 'admin' ? +g('fParOp').value : APP.cu.pid,
     obs:         g('fObs').value     || null,
   };

@@ -90,6 +90,7 @@
     <!-- DASHBOARD -->
     <div id="v-dashboard" class="view active">
       <div class="stats-grid" id="statsGrid"></div>
+      <div class="stats-grid" id="finStats" style="margin-top:16px"></div>
       <div class="charts-grid">
         <div class="scard">
           <div class="scard-title">Pipeline por Etapa</div>
@@ -145,14 +146,18 @@
     <!-- RELATÓRIOS -->
     <div id="v-relatorios" class="view">
       <div class="rep-stats"  id="repStats"></div>
+      <div class="rep-stats"  id="repFinStats" style="margin-top:16px"></div>
       <div class="charts-grid">
         <div class="scard"><div class="scard-title">Por Produto / Serviço</div><div class="scard-sub">Clique para detalhar</div><div id="barProd"></div></div>
         <div class="scard"><div class="scard-title" id="repConvTitle">Conversão por Parceiro</div><div class="scard-sub" id="repConvSub">% ganhos — clique para detalhar</div><div id="barConv"></div></div>
       </div>
-      <div class="scard">
-        <div class="scard-title">Distribuição por Status</div>
-        <div class="scard-sub">Clique em cada status para detalhar</div>
-        <div class="status-tiles" id="stTiles"></div>
+      <div class="charts-grid">
+        <div class="scard"><div class="scard-title" id="repValorTitle">Valor por Parceiro</div><div class="scard-sub" id="repValorSub">Soma dos valores estimados</div><div id="barValor"></div></div>
+        <div class="scard">
+          <div class="scard-title">Distribuição por Status</div>
+          <div class="scard-sub">Clique em cada status para detalhar</div>
+          <div class="status-tiles" id="stTiles"></div>
+        </div>
       </div>
     </div>
 
@@ -197,6 +202,7 @@
         </div>
         <div class="fg"><label class="fl">Etapa do Funil *</label>   <select class="fc" id="fStOp"></select></div>
         <div class="fg"><label class="fl">Previsão de Fechamento</label><input class="fc" id="fFech" type="month"></div>
+        <div class="fg"><label class="fl">Valor Estimado (R$)</label><input class="fc" id="fValor" placeholder="0,00" oninput="maskBRL(this)" autocomplete="off"></div>
         <div class="fg" id="fParWrap"><label class="fl">Parceiro</label><select class="fc" id="fParOp"></select></div>
         <div class="fg fg-full"><label class="fl">Observações</label><textarea class="fc" id="fObs" rows="2"></textarea></div>
       </div>

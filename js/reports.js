@@ -9,8 +9,10 @@ function renderReports() {
   const taxa = ops.length ? Math.round(gnh / ops.length * 100) : 0;
 
   _renderRepStats(ops, gnh, perd, taxa);
+  _renderRepFinStats(ops);
   _renderProductBar(ops);
   _renderConversionBar(ops);
+  _renderValorBar(ops);
   _renderStatusTiles(ops);
 }
 
@@ -37,6 +39,39 @@ function _renderRepStats(ops, gnh, perd, taxa) {
     } else {
       card.style.cursor = 'default';
     }
+    el.appendChild(card);
+  });
+}
+
+// ── Financial stat cards ─────────────────────────────────────
+function _renderRepFinStats(ops) {
+  const el = g('repFinStats');
+  if (!el) return;
+  el.innerHTML = '';
+
+  const withVal = ops.filter(o => o.valor_estimado > 0);
+  const sumTot  = withVal.reduce((s, o) => s + +o.valor_estimado, 0);
+  const sumGnh  = ops.filter(o => o.status === 'Ganho' && o.valor_estimado > 0)
+                     .reduce((s, o) => s + +o.valor_estimado, 0);
+  const sumPerd = ops.filter(o => o.status === 'Perdido' && o.valor_estimado > 0)
+                     .reduce((s, o) => s + +o.valor_estimado, 0);
+  const taxaVal = sumTot ? Math.round(sumGnh / sumTot * 100) : 0;
+
+  const defs = [
+    { l: 'Total Prospectado', v: fmtBRLShort(sumTot),  s: `${withVal.length} opp${withVal.length !== 1 ? 's' : ''} com valor informado`, c: '#7c3aed' },
+    { l: 'Valor Ganhos',      v: fmtBRLShort(sumGnh),  s: 'Negócios convertidos',   c: '#059669' },
+    { l: 'Valor Perdidos',    v: fmtBRLShort(sumPerd), s: 'Oportunidades perdidas',  c: '#dc2626' },
+    { l: 'Conv. por Valor',   v: taxaVal + '%',         s: 'Ganhos / total prospectado', c: '#c026d3' },
+  ];
+
+  defs.forEach(d => {
+    const card = document.createElement('div');
+    card.className = 'rep-stat';
+    card.style.cssText = `border-top-color:${d.c};cursor:default`;
+    card.innerHTML = `
+      <div class="rep-stat-label">${esc(d.l)}</div>
+      <div class="rep-stat-val" style="color:${d.c};font-size:18px">${d.v}</div>
+      <div class="rep-stat-sub">${esc(d.s)}</div>`;
     el.appendChild(card);
   });
 }
@@ -133,4 +168,62 @@ function _renderStatusTiles(ops) {
 
     el.appendChild(tile);
   });
+}
+
+// ── Bar: valor por parceiro (admin) / por produto (partner) ──
+function _renderValorBar(ops) {
+  const el = g('barValor');
+  if (!el) return;
+  el.innerHTML = '';
+
+  if (APP.cu.role === 'admin') {
+    g('repValorTitle').textContent = 'Valor Estimado por Parceiro';
+    g('repValorSub').textContent   = 'Soma dos valores — clique para detalhar';
+    const items = APP.partners.map((p, i) => ({
+      id: p.id, nome: p.nome.split(' ')[0], site: p.site,
+      v: ops.filter(o => o.parceiro_id === p.id && o.valor_estimado > 0)
+             .reduce((s, o) => s + +o.valor_estimado, 0),
+      opps: ops.filter(o => o.parceiro_id === p.id),
+    })).filter(p => p.v > 0).sort((a, b) => b.v - a.v);
+
+    const max = items[0]?.v || 1;
+    items.forEach(({ id, nome, site, v, opps: sub }, i) => {
+      const row = document.createElement('div');
+      row.className = 'bar-row'; row.style.cursor = 'pointer';
+      row.innerHTML = `
+        <div class="bar-lbl">${logoImg(site, nome)}${esc(nome)}</div>
+        <div class="bar-track"><div class="bar-fill" style="width:${v / max * 100}%;background:${CHART_FILLS[i % CHART_FILLS.length]}"></div></div>
+        <div class="bar-num" style="width:72px">${fmtBRLShort(v)}</div>`;
+      row.addEventListener('click', () => drill('Parceiro: ' + nome, sub));
+      el.appendChild(row);
+    });
+  } else {
+    g('repValorTitle').textContent = 'Valor Estimado por Produto';
+    g('repValorSub').textContent   = 'Soma dos valores — clique para detalhar';
+    const items = APP.products
+      .map((p, i) => ({
+        id: p.id, nome: p.nome,
+        v: ops.filter(o => (o.produtos_ids || []).includes(p.id) && o.valor_estimado > 0)
+               .reduce((s, o) => s + +o.valor_estimado, 0),
+        opps: ops.filter(o => (o.produtos_ids || []).includes(p.id)),
+      }))
+      .filter(p => p.v > 0)
+      .sort((a, b) => b.v - a.v);
+
+    const max = items[0]?.v || 1;
+    items.forEach(({ id, nome, v, opps: sub }, i) => {
+      const row = document.createElement('div');
+      row.className = 'bar-row'; row.style.cursor = 'pointer';
+      row.innerHTML = `
+        <div class="bar-lbl">${esc(nome)}</div>
+        <div class="bar-track"><div class="bar-fill" style="width:${v / max * 100}%;background:${CHART_FILLS[i % CHART_FILLS.length]}"></div></div>
+        <div class="bar-num" style="width:72px">${fmtBRLShort(v)}</div>`;
+      row.addEventListener('click', () => drill('Produto: ' + nome, sub));
+      el.appendChild(row);
+    });
+  }
+
+  if (!el.children.length) {
+    el.innerHTML = '<div style="padding:20px;text-align:center;color:var(--text3);font-size:13px">Nenhuma oportunidade com valor estimado preenchido.</div>';
+  }
 }

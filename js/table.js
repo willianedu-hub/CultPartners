@@ -200,6 +200,8 @@ function renderTable() {
           </span></td>`;
         case 'fechamento':
           return `<td>${fmtMonth(o.fechamento)}</td>`;
+        case 'valor':
+          return `<td style="font-weight:600;color:var(--green)">${fmtBRL(o.valor_estimado)}</td>`;
         case 'parceiro':
           return `<td><span class="ename">${logoImg(par.site, par.nome)}${esc(par.nome)}</span></td>`;
         case 'aprovacao':
@@ -236,7 +238,7 @@ function exportCSV() {
   const list = _filteredOpps();
   const headers = [
     'ID','Empresa','Site Empresa','CNPJ','Contato','Cargo',
-    'Produto','Status','Fechamento','Parceiro',
+    'Produtos','Status','Fechamento','Valor Estimado','Parceiro',
     'Aprovação','Data Aprovação','Aprovado Por',
     'Motivo Rejeição','Data Rejeição',
     'Observações','Tarefas Total','Tarefas Pendentes',
@@ -247,8 +249,9 @@ function exportCSV() {
     return [
       o.id, o.empresa, o.site_empresa || '', o.cnpj || '',
       o.contato || '', o.cargo || '',
-      o.produto || '', o.status,
+      o.produtos_nomes || o.produto || '', o.status,
       o.fechamento ? o.fechamento.slice(0, 7) : '',
+      o.valor_estimado != null ? Number(o.valor_estimado).toFixed(2).replace('.', ',') : '',
       par.nome, o.aprovacao,
       o.approved_at ? fmtDateTime(o.approved_at) : '',
       o.aprovado_por || '',

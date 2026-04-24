@@ -10,6 +10,7 @@ function renderDash() {
   const pnd  = ops.filter(o => o.aprovacao === 'Pendente').length;
 
   _renderStatCards(ops, tot, atv, gnh, pnd);
+  _renderFinCards(ops);
   _renderAlerts(ops);
   _renderDonut(ops);
   _renderBarPartner(ops);
@@ -42,6 +43,40 @@ function _renderStatCards(ops, tot, atv, gnh, pnd) {
       card.style.cursor = 'default';
     }
     grid.appendChild(card);
+  });
+}
+
+// ── Financial stat cards ─────────────────────────────────────
+function _renderFinCards(ops) {
+  const el = g('finStats');
+  if (!el) return;
+  el.innerHTML = '';
+
+  const withVal  = ops.filter(o => o.valor_estimado > 0);
+  const pipeline = ops.filter(o => !['Ganho','Perdido'].includes(o.status) && o.valor_estimado > 0);
+  const ganhos   = ops.filter(o => o.status === 'Ganho' && o.valor_estimado > 0);
+
+  const sumPipe  = pipeline.reduce((s, o) => s + +o.valor_estimado, 0);
+  const sumGnh   = ganhos.reduce((s, o) => s + +o.valor_estimado, 0);
+  const ticket   = withVal.length ? withVal.reduce((s, o) => s + +o.valor_estimado, 0) / withVal.length : 0;
+
+  const defs = [
+    { l: 'Valor Pipeline',  v: fmtBRLShort(sumPipe),  s: `${pipeline.length} opp${pipeline.length !== 1 ? 's' : ''} ativas com valor`, ico: '💰', c: '#0ea5e9', bg: '#f0f9ff' },
+    { l: 'Valor Ganhos',    v: fmtBRLShort(sumGnh),   s: `${ganhos.length} negócio${ganhos.length !== 1 ? 's' : ''} fechados`,         ico: '🏆', c: '#059669', bg: '#ecfdf5' },
+    { l: 'Ticket Médio',    v: fmtBRLShort(ticket),   s: `${withVal.length} opp${withVal.length !== 1 ? 's' : ''} com valor informado`, ico: '🎫', c: '#7c3aed', bg: '#f5f3ff' },
+  ];
+
+  defs.forEach(d => {
+    const card = document.createElement('div');
+    card.className = 'stat-card';
+    card.style.cursor = 'default';
+    card.innerHTML = `
+      <div class="stat-card-accent" style="background:${d.c}"></div>
+      <div class="stat-card-icon" style="background:${d.bg}">${d.ico}</div>
+      <div class="stat-label">${esc(d.l)}</div>
+      <div class="stat-val" style="color:${d.c};font-size:18px">${d.v}</div>
+      <div class="stat-sub">${esc(d.s)}</div>`;
+    el.appendChild(card);
   });
 }
 
@@ -249,8 +284,8 @@ function _svgText(svg, x, y, txt, fill, size, family, weight) {
 function drill(title, list) {
   const safe    = list || [];
   const isAdmin = APP.cu.role === 'admin';
-  const cols    = ['empresa','cnpj','contato','produto','status','fechamento','parceiro','aprovacao'];
-  const label   = { empresa:'Empresa',cnpj:'CNPJ',contato:'Contato',produto:'Produto',status:'Etapa',fechamento:'Fechamento',parceiro:'Parceiro',aprovacao:'Aprovação' };
+  const cols    = ['empresa','cnpj','contato','produto','status','fechamento','valor','parceiro','aprovacao'];
+  const label   = { empresa:'Empresa',cnpj:'CNPJ',contato:'Contato',produto:'Produto',status:'Etapa',fechamento:'Fechamento',valor:'Valor Est.',parceiro:'Parceiro',aprovacao:'Aprovação' };
   let _page = 0;
   let _ps   = APP.tPageSize;
 
@@ -294,6 +329,7 @@ function drill(title, list) {
         <td>${prodTagsHtml(o.produtos_nomes || o.produto)}</td>
         <td><span class="badge ${badgeCls(o.status)}">${esc(o.status)}</span></td>
         <td>${fmtMonth(o.fechamento)}</td>
+        <td style="font-weight:600;color:var(--green);white-space:nowrap">${fmtBRL(o.valor_estimado)}</td>
         <td><span class="ename">${logoImg(par.site, par.nome)}${esc(par.nome)}</span></td>
         <td><span class="badge ${badgeCls(o.aprovacao)}">${esc(o.aprovacao)}</span></td>
         ${actionCell}
