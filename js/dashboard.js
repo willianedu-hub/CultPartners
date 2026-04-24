@@ -141,26 +141,50 @@ function _renderDonut(ops) {
   svgEl.appendChild(txt);
 }
 
-// ── Bar chart (parceiros) ────────────────────────────────────
+// ── Bar chart (parceiros para admin / produtos para parceiro) ─
 function _renderBarPartner(ops) {
   const el = g('barPartner');
   el.innerHTML = '';
-  const sorted = [...APP.partners].sort(
-    (a, b) => ops.filter(o => o.parceiro_id === b.id).length - ops.filter(o => o.parceiro_id === a.id).length
-  );
-  const max = Math.max(...APP.partners.map(p => ops.filter(o => o.parceiro_id === p.id).length), 1);
-  sorted.forEach((p, i) => {
-    const v = ops.filter(o => o.parceiro_id === p.id).length;
-    const row = document.createElement('div');
-    row.className = 'bar-row';
-    row.innerHTML = `
-      <div class="bar-lbl">${logoImg(p.site, p.nome)}${esc(p.nome.split(' ')[0])}</div>
-      <div class="bar-track"><div class="bar-fill" style="width:${v / max * 100}%;background:${CHART_FILLS[i % CHART_FILLS.length]}"></div></div>
-      <div class="bar-num">${v}</div>`;
-    row.style.cursor = 'pointer';
-    row.addEventListener('click', () => drill('Parceiro: ' + p.nome, ops.filter(o => o.parceiro_id === p.id)));
-    el.appendChild(row);
-  });
+
+  if (APP.cu.role === 'admin') {
+    g('scardBarTitle').textContent = 'Oportunidades por Parceiro';
+    g('scardBarSub').textContent   = 'Clique para detalhar';
+    const sorted = [...APP.partners].sort(
+      (a, b) => ops.filter(o => o.parceiro_id === b.id).length - ops.filter(o => o.parceiro_id === a.id).length
+    );
+    const max = Math.max(...APP.partners.map(p => ops.filter(o => o.parceiro_id === p.id).length), 1);
+    sorted.forEach((p, i) => {
+      const v = ops.filter(o => o.parceiro_id === p.id).length;
+      const row = document.createElement('div');
+      row.className = 'bar-row';
+      row.innerHTML = `
+        <div class="bar-lbl">${logoImg(p.site, p.nome)}${esc(p.nome.split(' ')[0])}</div>
+        <div class="bar-track"><div class="bar-fill" style="width:${v / max * 100}%;background:${CHART_FILLS[i % CHART_FILLS.length]}"></div></div>
+        <div class="bar-num">${v}</div>`;
+      row.style.cursor = 'pointer';
+      row.addEventListener('click', () => drill('Parceiro: ' + p.nome, ops.filter(o => o.parceiro_id === p.id)));
+      el.appendChild(row);
+    });
+  } else {
+    g('scardBarTitle').textContent = 'Meus Resultados por Produto';
+    g('scardBarSub').textContent   = 'Clique para detalhar';
+    const prods = [...new Set(ops.map(o => o.produto).filter(Boolean))];
+    const sorted = prods
+      .map(nome => ({ nome, v: ops.filter(o => o.produto === nome).length }))
+      .sort((a, b) => b.v - a.v);
+    const max = Math.max(...sorted.map(p => p.v), 1);
+    sorted.forEach(({ nome, v }, i) => {
+      const row = document.createElement('div');
+      row.className = 'bar-row';
+      row.innerHTML = `
+        <div class="bar-lbl" style="max-width:130px;overflow:hidden;text-overflow:ellipsis">${esc(nome)}</div>
+        <div class="bar-track"><div class="bar-fill" style="width:${v / max * 100}%;background:${CHART_FILLS[i % CHART_FILLS.length]}"></div></div>
+        <div class="bar-num">${v}</div>`;
+      row.style.cursor = 'pointer';
+      row.addEventListener('click', () => drill('Produto: ' + nome, ops.filter(o => o.produto === nome)));
+      el.appendChild(row);
+    });
+  }
 }
 
 // ── Line chart (fechamento por mês) ─────────────────────────
