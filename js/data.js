@@ -71,21 +71,24 @@ const DB = {
     if (error) throw error;
 
     const ids = (data || []).map(o => o.id);
-    let tarefas = [];
-    let oppProds = [];
+    let tarefas = [], oppProds = [], valores = [];
 
     if (ids.length) {
-      const [{ data: td, error: te }, { data: pd }] = await Promise.all([
+      const [{ data: td, error: te }, { data: pd }, { data: vd }] = await Promise.all([
         sb.from('tarefas').select('*').in('oportunidade_id', ids).order('created_at'),
         sb.from('oportunidade_produtos').select('oportunidade_id, produto_id').in('oportunidade_id', ids),
+        // Busca valor_estimado direto da tabela (não depende da view ser recriada)
+        sb.from('oportunidades').select('id, valor_estimado').in('id', ids),
       ]);
       if (te) throw te;
       tarefas  = td || [];
       oppProds = pd || [];
+      valores  = vd || [];
     }
 
     return (data || []).map(o => {
-      const prodIds = oppProds
+      const valRow   = valores.find(v => v.id === o.id);
+      const prodIds  = oppProds
         .filter(op => op.oportunidade_id === o.id)
         .map(op => op.produto_id);
       const prodNames = prodIds.length
@@ -93,6 +96,7 @@ const DB = {
         : (o.produto || '');
       return {
         ...o,
+        valor_estimado: valRow?.valor_estimado ?? null,
         tarefas:        tarefas.filter(t => t.oportunidade_id === o.id),
         produtos_ids:   prodIds.length ? prodIds : (o.produto_id ? [o.produto_id] : []),
         produtos_nomes: prodNames,
