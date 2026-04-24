@@ -9,9 +9,14 @@ function buildFilters() {
     APP.statusList.map(s => `<option value="${s.id}">${esc(s.nome)}</option>`).join('');
 
   const fp = g('fPar');
-  fp.innerHTML = '<option value="">Todos os parceiros</option>' +
-    APP.partners.map(p => `<option value="${p.id}">${esc(p.nome)}</option>`).join('');
-  fp.style.display = APP.cu.role === 'admin' ? '' : 'none';
+  if (APP.cu.role === 'admin') {
+    fp.innerHTML = '<option value="">Todos os parceiros</option>' +
+      APP.partners.map(p => `<option value="${p.id}">${esc(p.nome)}</option>`).join('');
+    fp.style.display = '';
+  } else {
+    fp.innerHTML = '';
+    fp.style.display = 'none';
+  }
 
   g('fApv').style.display = APP.cu.role === 'admin' ? '' : 'none';
 }

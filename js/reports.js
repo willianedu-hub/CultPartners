@@ -63,26 +63,47 @@ function _renderProductBar(ops) {
   });
 }
 
-// ── Bar: conversão por parceiro ───────────────────────────────
+// ── Bar: conversão por parceiro (admin) / por produto (parceiro) ─
 function _renderConversionBar(ops) {
   const el = g('barConv');
   el.innerHTML = '';
 
-  APP.partners.forEach((p, i) => {
-    const total = ops.filter(o => o.parceiro_id === p.id).length;
-    const ganhos = ops.filter(o => o.parceiro_id === p.id && o.status === 'Ganho').length;
-    const pct = total ? Math.round(ganhos / total * 100) : 0;
-
-    const row = document.createElement('div');
-    row.className    = 'bar-row';
-    row.style.cursor = 'pointer';
-    row.innerHTML = `
-      <div class="bar-lbl">${logoImg(p.site, p.nome)}${esc(p.nome.split(' ')[0])}</div>
-      <div class="bar-track"><div class="bar-fill" style="width:${pct}%;background:${CHART_FILLS[i % CHART_FILLS.length]}"></div></div>
-      <div class="bar-num">${pct}%</div>`;
-    row.addEventListener('click', () => drill('Parceiro: ' + p.nome, ops.filter(o => o.parceiro_id === p.id)));
-    el.appendChild(row);
-  });
+  if (APP.cu.role === 'admin') {
+    g('repConvTitle').textContent = 'Conversão por Parceiro';
+    g('repConvSub').textContent   = '% ganhos — clique para detalhar';
+    APP.partners.forEach((p, i) => {
+      const total  = ops.filter(o => o.parceiro_id === p.id).length;
+      const ganhos = ops.filter(o => o.parceiro_id === p.id && o.status === 'Ganho').length;
+      const pct    = total ? Math.round(ganhos / total * 100) : 0;
+      const row    = document.createElement('div');
+      row.className    = 'bar-row';
+      row.style.cursor = 'pointer';
+      row.innerHTML = `
+        <div class="bar-lbl">${logoImg(p.site, p.nome)}${esc(p.nome.split(' ')[0])}</div>
+        <div class="bar-track"><div class="bar-fill" style="width:${pct}%;background:${CHART_FILLS[i % CHART_FILLS.length]}"></div></div>
+        <div class="bar-num">${pct}%</div>`;
+      row.addEventListener('click', () => drill('Parceiro: ' + p.nome, ops.filter(o => o.parceiro_id === p.id)));
+      el.appendChild(row);
+    });
+  } else {
+    g('repConvTitle').textContent = 'Minha Conversão por Produto';
+    g('repConvSub').textContent   = '% ganhos por produto — clique para detalhar';
+    const prods = [...new Set(ops.map(o => o.produto).filter(Boolean))];
+    prods.forEach((nome, i) => {
+      const total  = ops.filter(o => o.produto === nome).length;
+      const ganhos = ops.filter(o => o.produto === nome && o.status === 'Ganho').length;
+      const pct    = total ? Math.round(ganhos / total * 100) : 0;
+      const row    = document.createElement('div');
+      row.className    = 'bar-row';
+      row.style.cursor = 'pointer';
+      row.innerHTML = `
+        <div class="bar-lbl" style="max-width:130px;overflow:hidden;text-overflow:ellipsis">${esc(nome)}</div>
+        <div class="bar-track"><div class="bar-fill" style="width:${pct}%;background:${CHART_FILLS[i % CHART_FILLS.length]}"></div></div>
+        <div class="bar-num">${pct}%</div>`;
+      row.addEventListener('click', () => drill('Produto: ' + nome, ops.filter(o => o.produto === nome)));
+      el.appendChild(row);
+    });
+  }
 }
 
 // ── Status tiles ──────────────────────────────────────────────
