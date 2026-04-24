@@ -20,13 +20,15 @@ All Supabase calls are centralized in `js/data.js` via the `DB` object — no ot
 ### Global state
 Everything lives in the `APP` object defined in `js/config.js`:
 ```javascript
-APP.cu          // current user: { role: 'admin'|'partner', pid, name, ini, site }
+APP.cu          // current user: { role: 'admin'|'partner', pid, name, ini, site, login }
 APP.opps        // loaded opportunities (from v_oportunidades)
 APP.statusList / APP.partners / APP.products  // reference data
 APP.visCols     // visible table columns (persisted to DB)
 APP.editId      // ID of opportunity being edited (null = new)
 APP.editTasks   // tasks being edited in modal
 APP.tSort       // { col: 'empresa', dir: 'asc' }
+APP.tPage       // current page index (0-based) for opportunities table
+APP.tPageSize   // rows per page (default 30)
 ```
 
 ### Script load order (must be maintained)
@@ -137,10 +139,13 @@ Typography: `Rajdhani` 700 (headings) + `Plus Jakarta Sans` 400/500/600 (body) f
 
 ## Implemented Features
 
-- Login/logout with session in localStorage (`cp_session_v2`), two roles: `admin` and `partner`
+- Login/logout with session in localStorage (`cp_session_v2`), two roles: `admin` and `partner`; `APP.cu` includes `login` field
 - Collapsible sidebar with tooltips in collapsed mode; Gmail-style user menu in topbar
 - Dashboard: 4 stat cards, donut chart, bar by partner, line chart by fechamento — all with drill-down
+- Dashboard drill-down modals have inline approve/reject actions for admins (pending rows get ✅/❌; rejected get ↩ Reverter)
+- Dashboard 60-day alert: styled table at bottom of dashboard (color-coded: >60d yellow, >90d orange, >120d red); "Ganho" opportunities excluded
 - Opportunities table: column sort, filters, column picker (persisted to DB), CSV export, double-click to edit
+- **Table pagination**: `buildPagerHTML(total, page, ps, goFn, sizeFn)` in `table.js`; default 30 rows, options 10/30/50/100; drill modals also paginated via closure state (`window._drillGoPage` / `window._drillSetSize`)
 - Kanban drag & drop with optimistic update + rollback on error
 - Reports: by produto, parceiro conversion, status tiles — all with drill-down
 - Opportunity modal: new + edit, real-time duplicate detection, auto-logo from `site_empresa`
@@ -148,11 +153,12 @@ Typography: `Rajdhani` 700 (headings) + `Plus Jakarta Sans` 400/500/600 (body) f
 - Tasks per opportunity: create, complete, delete — alert if approved 60+ days with no task
 - Admin CRUD: funil status, partners (with edit), products/services
 - Soft delete via `fn_delete_oportunidade()` (audit_log); soft delete for partners via `DB.softDeletePartner()`
+- **Change password modal** (`mSenha`): validates current password via login RPC, enforces min 8 chars + uppercase + number + special; strength indicator in real-time
+- **Audit log viewer** in Configurações: filterable by action/user, paginated, color-coded admin (purple) vs partner (blue) rows
+- `DB.changePassword(role, id, nova)` and `DB.loadAuditLog()` added to `data.js`
 
 ## Pending Backlog
 
-- [ ] "Change my password" screen for admin and partners (`fn_set_senha_*` RPCs already exist in DB)
-- [ ] Table pagination via Supabase `.range()`
 - [ ] Email notifications (Supabase Edge Functions + Resend/SendGrid): new pending opportunity, approval/rejection, 60-day task alert
 - [ ] Realtime dashboard updates via `supabase.channel()`
 - [ ] Exportable PDF report
@@ -162,13 +168,37 @@ Typography: `Rajdhani` 700 (headings) + `Plus Jakarta Sans` 400/500/600 (body) f
 - [ ] Estimated deal value field (for financial pipeline)
 - [ ] Multiple admin levels/permissions
 
+## Branches
+
+| Branch | Purpose |
+|--------|---------|
+| `claude/cd-cultpartners-lWyXn` | Main dev branch — CultPartners (CULTSEC) |
+| `cliente-takoda` | Client deployment — Takoda Data Centers (orange branding, separate Supabase) |
+
+## Client Branch: cliente-takoda
+
+Takoda Data Centers white-label deployment. Key differences from main:
+- **Colors**: `--primary: #E85D1A` (orange), `--accent: #F5A623` (gold)
+- **Logo**: `assets/takoda-logo.png` (file exists in repo)
+- **Title**: "TakodaPartners – Takoda Data Centers"
+- **Powered by VSYNC** tagline on login screen
+- **Supabase credentials** in `js/config.js` point to Takoda's own project
+- **SQL setup files** (run in order on Takoda's Supabase):
+  1. `takoda_part1_schema.sql` — tables + view
+  2. `takoda_part2_rls_functions.sql` — RLS + RPCs + trigger
+  3. `takoda_part3_seed_base.sql` — admin (`admin`/`Takoda@2025!`), status, 12 products, 10 partners (`Parceiro@2025!`)
+  4. `takoda_part4_seed_opps_a.sql` — opportunities 1–75
+  5. `takoda_part5_seed_opps_b.sql` — opportunities 76–155 + demo tasks
+- **Deployed on Vercel** pointing to `cliente-takoda` branch (set as GitHub default branch)
+- **Mobile hamburger menu**: `toggleMobileSidebar()` / `closeMobileSidebar()` in `ui.js`; overlay `#sidebarOverlay`; sidebar closes on `nav()` call
+
 ## Deployment
 
-No build step. Deploy by uploading the folder contents to Netlify. The `_redirects` file handles SPA routing (`/* /index.html 200`).
+No build step. Deploy by uploading the folder contents to Netlify. The `_redirects` file handles SPA routing (`/* /index.html 200`). For Vercel, use `vercel.json` with rewrites to `/index.html`.
 
-## SQL Files
+## Known Patterns / Gotchas
 
-| File | Description |
-|------|-------------|
-| `cultpartners_schema_v2.sql` | Full schema: DROP → CREATE → RLS → Triggers → Functions → Seed |
-| `cultpartners_seed.sql` | 10 partners + 50 varied opportunities + demo tasks |
+- **Stream timeout**: When generating large files (SQL, HTML), go directly to `Write` tool — avoid long text responses before tool calls.
+- **SQL single quotes**: Use `''` (two apostrophes) to escape, never `\'` — PostgreSQL does not accept backslash escaping in standard strings.
+- **Push rejected (non-fast-forward)**: Run `git pull origin <branch> --no-rebase` then `git push`.
+- **Edit tool**: File must be `Read` at least once in the session before `Edit` will work.
