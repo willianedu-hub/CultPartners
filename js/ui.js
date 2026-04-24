@@ -213,7 +213,6 @@ function toggleUM() {
 // ── Confirm dialog (Promise-based, substitui browser confirm) ─
 function confirmDialog(msg) {
   return new Promise(resolve => {
-    // Por ora usa o confirm nativo; pode ser substituído por modal custom
-    resolve(window.confirm(msg));
+    setTimeout(() => resolve(window.confirm(msg)), 0);
   });
 }
