@@ -12,10 +12,14 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 - **Passwords:** bcrypt via PostgreSQL `pgcrypto` — `crypt(senha, gen_salt('bf', 12))`
 - **Logos:** Google S2 Favicons API — `https://www.google.com/s2/favicons?sz=32&domain=`
 
+> **DB consolidado (importante):** desde a consolidação, o app aponta para o projeto Supabase de destino e **todas as tabelas do CultPartners vivem no schema dedicado `cultpartners`** (não em `public`). O cliente é criado com `supabase.createClient(url, key, { db: { schema: 'cultpartners' } })` em `js/config.js`, então `.from()` e `.rpc()` miram esse schema automaticamente — o `data.js` usa nomes "crus", sem qualificar schema. Ver a seção **Database Consolidation** e a pasta `migrations/`.
+
 ## Architecture
 
 ### Data flow
 All Supabase calls are centralized in `js/data.js` via the `DB` object — no other file calls `sb.from()` directly. The frontend always reads opportunities through the `v_oportunidades` view (never the raw `oportunidades` table). The view denormalizes produto, status, parceiro, and admin approver/rejecter, and includes `tarefas_total` / `tarefas_pendentes` as subqueries.
+
+**`DB.loadOpps()` enriches each opportunity** beyond the view: it fetches the `oportunidade_produtos` junction (N:N) and `oportunidades.valor_estimado` directly from the base table in parallel, then injects `produtos_ids` (array), `produtos_nomes` (comma-joined string) and `valor_estimado` into each row. Reason `valor_estimado` is read from the base table: a PostgreSQL view with `SELECT *` does **not** auto-pick up new columns — the view was recreated to include it, but the direct fetch also guards against a stale view. Multiple products per opportunity are the norm now; `produto_id` on `oportunidades` is kept only as a legacy/first-product fallback.
 
 ### Global state
 Everything lives in the `APP` object defined in `js/config.js`:
@@ -74,6 +78,11 @@ dateToMonth(d)      // "2025-06-01" → "2025-06"  (use for input[type=month])
 fmtDate(d)          // "2025-06-01" → "01/06/2025"
 fmtDateTime(d)      // ISO → "01/06/2025 14:30"
 logoImg(site, alt)  // returns <img> with Google S2 favicon or ''
+fmtBRL(v)           // 85000 → "R$ 85.000,00"
+fmtBRLShort(v)      // 85000 → "R$ 85K" · 1200000 → "R$ 1,2M"  (compact, for cards/kanban)
+maskBRL(el)         // input mask: types digits → "1.234,56"
+parseBRL(str)       // "1.234,56" → 1234.56 (null if empty/zero) — use when saving valor_estimado
+prodTagsHtml(nomes, max=2) // comma-joined product names → compact tags + "+N" overflow badge
 ```
 
 ### Async error handling pattern
@@ -96,11 +105,14 @@ try {
 - `admins` — `id, nome, login (UNIQUE), senha_hash, email, ativo`
 - `parceiros` — `id, nome, cnpj, site, login (UNIQUE), senha_hash, email, ativo, deleted_at`
 - `status_funil` — `id, nome (UNIQUE), cor (hex), ordem (SMALLINT), ativo`
-- `produtos` — `id, nome (UNIQUE), categoria, descricao, ativo`
-- `oportunidades` — `id, empresa, cnpj, site_empresa, contato, cargo, obs, produto_id, status_id, fechamento (DATE), parceiro_id, aprovacao (ENUM: Pendente|Aprovado|Rejeitado), approved_by, rejected_by, deleted_at`
+- `produtos` — `id, nome (UNIQUE), categoria, descricao, ativo, ordem (SMALLINT)` — 35-product catalog in 5 categories; `ordem` groups the multi-level picker
+- `oportunidades` — `id, empresa, cnpj, site_empresa, contato, cargo, obs, produto_id, status_id, fechamento (DATE), parceiro_id, aprovacao (ENUM: Pendente|Aprovado|Rejeitado), approved_by, rejected_by, deleted_at, valor_estimado (NUMERIC(14,2))`
+- `oportunidade_produtos` — N:N junction: `oportunidade_id (CASCADE DELETE), produto_id`, PK on both. One opportunity → many products.
 - `tarefas` — `id, oportunidade_id (CASCADE DELETE), descricao, prazo, responsavel, concluida, concluida_em`
 - `preferencias_usuario` — `user_key (PK), colunas (JSONB)`
 - `audit_log` — `id, tabela, registro_id, acao, usuario, dados_antes (JSONB), dados_depois (JSONB)`
+
+**`aprovacao_status`** is a custom ENUM (`Pendente|Aprovado|Rejeitado`). The `empresa` GIN trigram index needs `pg_trgm`; passwords need `pgcrypto` — both installed in the `extensions` schema. All the above tables live in the **`cultpartners`** schema.
 
 ### RPC Functions (called via `sb.rpc()`)
 ```
@@ -112,7 +124,20 @@ fn_delete_oportunidade(p_id, p_usuario) → soft delete + audit_log entry
 ```
 
 ### RLS
-All tables use `allow_all` via anon key. Partner data isolation is enforced in JS with `.eq('parceiro_id', cu.pid)`.
+All tables use `allow_all` via anon key (in `cultpartners`, RLS is enabled with `allow_all` policies re-created for the schema). Partner data isolation is enforced in JS with `.eq('parceiro_id', cu.pid)` / by loading opps filtered by `parceiro_id` — **not** by row-level policies. The RPC functions are `SECURITY DEFINER` with `SET search_path = cultpartners, extensions, public` so `crypt()`/`gen_salt()` resolve.
+
+## Database Consolidation (schema `cultpartners`)
+
+The CultPartners database was **consolidated into another Supabase project** (the app now points there via `js/config.js`). To avoid mixing tables, all CultPartners objects live in a dedicated **`cultpartners`** schema; the other app keeps its own `public`. Because both share one Postgres, cross-app reads are native cross-schema SQL (no Foreign Data Wrapper).
+
+The migration lives in `migrations/`, run in order in the **destination** project's SQL Editor:
+1. `consolidacao_01_schema.sql` — schema, ENUM, extensions, 9 tables, view, 7 functions, triggers, RLS, grants (`anon`/`authenticated`/`service_role`), `NOTIFY pgrst`.
+2. `consolidacao_02_dados.sql` — data (179 rows) with `OVERRIDING SYSTEM VALUE` (ids are `GENERATED ALWAYS AS IDENTITY`), FK-safe order, sequence resets, `TRUNCATE … RESTART IDENTITY` at top (rerunnable).
+3. **Dashboard step (not SQL):** Settings → API → add `cultpartners` to *Exposed schemas* and *Extra search path*, then reload — required for PostgREST/supabase-js to see the schema.
+
+Other migrations: `multi_produto.sql` (junction + 35-product catalog), `valor_estimado.sql` (column + view recreate), `seed_movti_opps.sql` (sample opps for partner Movti, id 11).
+
+**Gotchas that bit us:** (a) a `SELECT *` view does not auto-add new base columns — recreate it; (b) `CREATE OR REPLACE VIEW` fails if column order changes — use `DROP VIEW` + `CREATE`; (c) identity columns need `OVERRIDING SYSTEM VALUE` on data load; (d) SECURITY DEFINER functions must pin `search_path` to find pgcrypto in `extensions`.
 
 ## Design System (`css/app.css`)
 
@@ -156,6 +181,9 @@ Typography: `Rajdhani` 700 (headings) + `Plus Jakarta Sans` 400/500/600 (body) f
 - **Change password modal** (`mSenha`): validates current password via login RPC, enforces min 8 chars + uppercase + number + special; strength indicator in real-time
 - **Audit log viewer** in Configurações: filterable by action/user, paginated, color-coded admin (purple) vs partner (blue) rows
 - `DB.changePassword(role, id, nova)` and `DB.loadAuditLog()` added to `data.js`
+- **Multi-product per opportunity**: grouped, collapsible, multi-select picker in the opportunity modal (`_buildProdPicker`/`toggleProdCat`/`_getSelectedProdIds` in `ops.js`); saved via `DB.saveOppProducts(oppId, ids)` into `oportunidade_produtos`. Products shown as compact tags (`prodTagsHtml`) in table/kanban/dashboard/reports; charts group by `produtos_ids`. On edit, product is optional (legacy opps whose products were deactivated still save).
+- **Estimated deal value** (`valor_estimado`): masked BRL input in the modal; "Valor Est." column in the table + CSV; value on kanban cards; 3 financial stat cards on the dashboard (Valor Pipeline / Valor Ganhos / Ticket Médio) and 4 on reports (Total Prospectado / Ganhos / Perdidos / Conversão por Valor) + a "Valor por Parceiro/Produto" bar
+- **Role-aware charts**: partners never see cross-partner data. `_renderBarPartner`/`_renderConversionBar`/`_renderValorBar` branch on `APP.cu.role` (admin → by partner; partner → by product). Partner filter dropdown emptied for partners in `buildFilters()`.
 
 ## Pending Backlog
 
@@ -164,15 +192,17 @@ Typography: `Rajdhani` 700 (headings) + `Plus Jakarta Sans` 400/500/600 (body) f
 - [ ] Exportable PDF report
 - [ ] Opportunity movement timeline/history
 - [ ] Date range filter on dashboard
-- [ ] Partner-specific dashboard (own metrics only)
-- [ ] Estimated deal value field (for financial pipeline)
 - [ ] Multiple admin levels/permissions
+- [ ] Bidirectional read of the *other* app's schema from within CultPartners (recommended: a view inside `cultpartners` that selects from the other schema, to keep `data.js` bare-name convention)
+
+Done recently (kept for reference): estimated deal value ✅, multi-product per opportunity ✅, partner-specific dashboard/charts ✅.
 
 ## Branches
 
 | Branch | Purpose |
 |--------|---------|
-| `claude/cd-cultpartners-lWyXn` | Main dev branch — CultPartners (CULTSEC) |
+| `main` | **Current working/production branch** for CultPartners (CULTSEC). Development now happens directly on `main`. |
+| `claude/cd-cultpartners-lWyXn` | Former dev branch (fully merged into `main`). |
 | `cliente-takoda` | Client deployment — Takoda Data Centers (orange branding, separate Supabase) |
 
 ## Client Branch: cliente-takoda
@@ -202,3 +232,5 @@ No build step. Deploy by uploading the folder contents to Netlify. The `_redirec
 - **SQL single quotes**: Use `''` (two apostrophes) to escape, never `\'` — PostgreSQL does not accept backslash escaping in standard strings.
 - **Push rejected (non-fast-forward)**: Run `git pull origin <branch> --no-rebase` then `git push`.
 - **Edit tool**: File must be `Read` at least once in the session before `Edit` will work.
+- **No DB access from the agent environment**: some Claude Code environments block outbound to Supabase (Postgres port 5432 and `*.supabase.co`/`api.supabase.com` over HTTPS) by egress policy. When that happens you **cannot** run `psql`/`pg_dump` or the Management API from the agent — the user runs SQL in the Supabase **SQL Editor** (browser) and pastes results back. To extract data for migration: `SELECT json_build_object('table', (SELECT json_agg(t) FROM public.table t), …)` → paste JSON → generate INSERTs with a local Python script.
+- **Credentials**: only the Supabase URL + anon (publishable) key belong in `js/config.js` (they ship to the browser, public by design). Never put the Postgres connection string / service_role key / Personal Access Token in the repo — those stay with the user.
