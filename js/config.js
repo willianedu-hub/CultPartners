@@ -4,11 +4,14 @@
 //  Supabase → Project Settings → API
 // ============================================================
 
-const SUPABASE_URL  = 'https://kjzpjuxekzhjoyernxuv.supabase.co';
-const SUPABASE_ANON = 'sb_publishable_p_H6fbhHXM9JYzG5vROAKA_jMDIpWYF';
+const SUPABASE_URL  = 'https://xqrudhwtdwzmgwstcyoh.supabase.co';
+const SUPABASE_ANON = 'sb_publishable_4aHiAf6rjVHQDB9gNZgX4g_AMby6KQj';
 
 // Cliente global — usado por todos os módulos
-const sb = supabase.createClient(SUPABASE_URL, SUPABASE_ANON);
+// Banco consolidado: dados do CultPartners vivem no schema dedicado `cultpartners`
+const sb = supabase.createClient(SUPABASE_URL, SUPABASE_ANON, {
+  db: { schema: 'cultpartners' }
+});
 
 // ── Colunas da tabela de oportunidades ──────────────────────
 const ALL_COLS = [
