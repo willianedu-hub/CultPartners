@@ -1,0 +1,405 @@
+// CultPartners — schema Prisma
+//
+// Dois blocos:
+//   1) DOMÍNIO (tabelas que JÁ existem no Supabase, schema `cultpartners`): mapeadas
+//      com @map/@@map para os nomes reais (snake_case). NÃO recriar — já estão em
+//      produção. Rodar `prisma db pull` para reconciliar se houver divergência.
+//   2) AUTH/OAUTH/MCP (tabelas NOVAS): User/Role/Permission + ApiToken/OAuthClient/
+//      OAuthCode + Auditoria. Criadas por migration manual (prisma/manual/*.sql),
+//      no mesmo schema `cultpartners`.
+//
+// Login: admins e executivos de canal entram por Microsoft (Entra) e viram linha em
+// `User` (RBAC). Parceiros seguem no login+senha próprio (tabela `parceiros`), fora do
+// OAuth. Ver docs do CRM (docs/mcp.md) para o racional do modelo de identidade.
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  schemas  = ["cultpartners"]
+}
+
+// ═══════════════════════════ 1) DOMÍNIO (existente) ═══════════════════════════
+
+enum AprovacaoStatus {
+  Pendente
+  Aprovado
+  Rejeitado
+
+  @@map("aprovacao_status")
+  @@schema("cultpartners")
+}
+
+model Parceiro {
+  id        BigInt    @id @default(autoincrement())
+  nome      String
+  cnpj      String?
+  site      String?
+  login     String    @unique
+  senhaHash String    @map("senha_hash")
+  email     String?
+  ativo     Boolean   @default(true)
+  deletedAt DateTime? @map("deleted_at")
+  createdAt DateTime  @default(now()) @map("created_at")
+  updatedAt DateTime  @updatedAt @map("updated_at")
+
+  oportunidades Oportunidade[]
+  execAccess    ExecParceiro[]
+
+  @@index([ativo])
+  @@map("parceiros")
+  @@schema("cultpartners")
+}
+
+model Produto {
+  id        BigInt   @id @default(autoincrement())
+  nome      String   @unique
+  categoria String?
+  descricao String?
+  ativo     Boolean  @default(true)
+  ordem     Int      @default(0) @db.SmallInt
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  oportunidades Oportunidade[]
+
+  @@map("produtos")
+  @@schema("cultpartners")
+}
+
+model StatusFunil {
+  id        BigInt   @id @default(autoincrement())
+  nome      String   @unique
+  cor       String   @default("#64748b")
+  ordem     Int      @default(99) @db.SmallInt
+  ativo     Boolean  @default(true)
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  oportunidades Oportunidade[]
+
+  @@map("status_funil")
+  @@schema("cultpartners")
+}
+
+model Admin {
+  id        BigInt   @id @default(autoincrement())
+  nome      String
+  login     String   @unique
+  senhaHash String   @map("senha_hash")
+  email     String?
+  ativo     Boolean  @default(true)
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  @@map("admins")
+  @@schema("cultpartners")
+}
+
+model Oportunidade {
+  id             BigInt          @id @default(autoincrement())
+  empresa        String
+  cnpj           String?
+  siteEmpresa    String?         @map("site_empresa")
+  contato        String?
+  cargo          String?
+  obs            String?
+  produtoId      BigInt?         @map("produto_id")
+  produto        Produto?        @relation(fields: [produtoId], references: [id])
+  statusId       BigInt?         @map("status_id")
+  status         StatusFunil?    @relation(fields: [statusId], references: [id])
+  fechamento     DateTime?       @db.Date
+  parceiroId     BigInt?         @map("parceiro_id")
+  parceiro       Parceiro?       @relation(fields: [parceiroId], references: [id])
+  aprovacao      AprovacaoStatus @default(Pendente)
+  approvedAt     DateTime?       @map("approved_at")
+  approvedBy     BigInt?         @map("approved_by")
+  motivoRejeicao String?         @map("motivo_rejeicao")
+  rejectedAt     DateTime?       @map("rejected_at")
+  rejectedBy     BigInt?         @map("rejected_by")
+  deletedAt      DateTime?       @map("deleted_at")
+  valorEstimado  Decimal?        @map("valor_estimado") @db.Decimal(14, 2)
+  createdAt      DateTime        @default(now()) @map("created_at")
+  updatedAt      DateTime        @updatedAt @map("updated_at")
+
+  tarefas Tarefa[]
+
+  @@index([parceiroId])
+  @@index([statusId])
+  @@index([aprovacao])
+  @@index([deletedAt])
+  @@map("oportunidades")
+  @@schema("cultpartners")
+}
+
+model Tarefa {
+  id             BigInt       @id @default(autoincrement())
+  oportunidadeId BigInt       @map("oportunidade_id")
+  oportunidade   Oportunidade @relation(fields: [oportunidadeId], references: [id], onDelete: Cascade)
+  descricao      String?
+  prazo          DateTime?    @db.Date
+  responsavel    String?
+  concluida      Boolean      @default(false)
+  concluidaEm    DateTime?    @map("concluida_em")
+  createdAt      DateTime     @default(now()) @map("created_at")
+  updatedAt      DateTime     @updatedAt @map("updated_at")
+
+  @@index([oportunidadeId])
+  @@map("tarefas")
+  @@schema("cultpartners")
+}
+
+// Junção N:N oportunidade↔produto. As colunas são `integer` no banco (não bigint),
+// então é modelada SEM relação Prisma para evitar conflito de tipo com os ids bigint;
+// o join é feito por query explícita na camada de dados (como faz o CRM).
+model OportunidadeProduto {
+  oportunidadeId Int @map("oportunidade_id")
+  produtoId      Int @map("produto_id")
+
+  @@id([oportunidadeId, produtoId])
+  @@map("oportunidade_produtos")
+  @@schema("cultpartners")
+}
+
+model PreferenciaUsuario {
+  userKey   String   @id @map("user_key")
+  colunas   Json?
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  @@map("preferencias_usuario")
+  @@schema("cultpartners")
+}
+
+// Trilha legada do SPA (mantida para compatibilidade). A trilha da camada
+// MCP/OAuth/interna é a `Auditoria` abaixo.
+model AuditLogLegacy {
+  id          BigInt   @id @default(autoincrement())
+  tabela      String?
+  registroId  BigInt?  @map("registro_id")
+  acao        String?
+  usuario     String?
+  dadosAntes  Json?    @map("dados_antes")
+  dadosDepois Json?    @map("dados_depois")
+  createdAt   DateTime @default(now()) @map("created_at")
+
+  @@map("audit_log")
+  @@schema("cultpartners")
+}
+
+// ═══════════════════════ 2) AUTH / RBAC / OAUTH / MCP (novo) ═══════════════════════
+// Identidade interna (admins + executivos de canal). Login por Microsoft (Entra) ou
+// senha local de emergência. Espelha o modelo do CRM (User/Role/Permission).
+
+enum PermissionScope {
+  OWN
+  TEAM
+  ALL
+
+  @@schema("cultpartners")
+}
+
+model User {
+  id           String    @id @default(cuid())
+  name         String
+  email        String    @unique
+  /// Anulável: quem entra só por SSO não carrega senha local. O admin mantém senha
+  /// de propósito (porta de emergência se o Entra cair).
+  passwordHash String?
+  active       Boolean   @default(true)
+  createdAt    DateTime  @default(now())
+  updatedAt    DateTime  @updatedAt
+  /// Corte de validade das sessões: token emitido ANTES deste instante é recusado.
+  sessionsValidFrom DateTime?
+
+  roles      UserRole[]
+  apiTokens  ApiToken[]
+  oauthCodes OAuthCode[]
+  /// Parceiros que este usuário (executivo de canal) enxerga. Vazio para admin = tudo.
+  execAccess ExecParceiro[]
+
+  @@map("usuarios_internos")
+  @@schema("cultpartners")
+}
+
+model Role {
+  id          String           @id @default(cuid())
+  name        String           @unique
+  description String?
+  isSystem    Boolean          @default(false)
+  createdAt   DateTime         @default(now())
+  users       UserRole[]
+  permissions RolePermission[]
+
+  @@map("roles")
+  @@schema("cultpartners")
+}
+
+model Permission {
+  id          String          @id @default(cuid())
+  key         String          @unique
+  scope       PermissionScope @default(ALL)
+  description String?
+  roles       RolePermission[]
+
+  @@map("permissions")
+  @@schema("cultpartners")
+}
+
+model UserRole {
+  userId String
+  roleId String
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+  role   Role   @relation(fields: [roleId], references: [id], onDelete: Cascade)
+
+  @@id([userId, roleId])
+  @@map("usuario_roles")
+  @@schema("cultpartners")
+}
+
+model RolePermission {
+  roleId       String
+  permissionId String
+  role         Role       @relation(fields: [roleId], references: [id], onDelete: Cascade)
+  permission   Permission @relation(fields: [permissionId], references: [id], onDelete: Cascade)
+
+  @@id([roleId, permissionId])
+  @@map("role_permissions")
+  @@schema("cultpartners")
+}
+
+/// Escopo do executivo de canal: quais parceiros ele pode ler. Admin não precisa de
+/// linha aqui (vê tudo). Aplicado SEMPRE no servidor, nunca por parâmetro do cliente.
+model ExecParceiro {
+  userId     String
+  parceiroId BigInt   @map("parceiro_id")
+  user       User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  parceiro   Parceiro @relation(fields: [parceiroId], references: [id], onDelete: Cascade)
+  createdAt  DateTime @default(now()) @map("created_at")
+
+  @@id([userId, parceiroId])
+  @@index([parceiroId])
+  @@map("exec_parceiros")
+  @@schema("cultpartners")
+}
+
+// ── Credencial de máquina (MCP) + token OAuth. Mesma linha para os dois (kind). ──
+model ApiToken {
+  id          String    @id @default(cuid())
+  userId      String
+  user        User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  name        String
+  /// Prefixo visível: acha a linha na tela sem revelar o segredo.
+  prefix      String    @unique
+  /// SHA-256 do segredo — nunca o segredo. @unique: a igualdade acontece no índice.
+  tokenHash   String    @unique
+  scopes      String[]
+  expiresAt   DateTime
+  lastUsedAt  DateTime?
+  revokedAt   DateTime?
+  windowStart DateTime  @default(now())
+  windowCount Int       @default(0)
+  createdAt   DateTime  @default(now())
+
+  // ── OAuth 2.1 ──
+  /// "pat" = criado na tela; "oauth" = emitido pelo fluxo de autorização.
+  kind             String       @default("pat")
+  clientId         String?
+  client           OAuthClient? @relation(fields: [clientId], references: [clientId], onDelete: Cascade)
+  refreshTokenHash String?      @unique
+  refreshExpiresAt DateTime?
+
+  @@index([userId])
+  @@index([clientId])
+  @@map("api_tokens")
+  @@schema("cultpartners")
+}
+
+// ── OAuth 2.1 — o CultPartners como SERVIDOR DE AUTORIZAÇÃO, federando ao Entra. ──
+model OAuthClient {
+  id               String    @id @default(cuid())
+  clientId         String    @unique
+  clientSecretHash String?
+  name             String
+  redirectUris     String[]
+  scopes           String[]
+  origem           String    @default("dcr")
+  disabled         Boolean   @default(false)
+  createdAt        DateTime  @default(now())
+  lastUsedAt       DateTime?
+
+  codes  OAuthCode[]
+  tokens ApiToken[]
+
+  @@map("oauth_clients")
+  @@schema("cultpartners")
+}
+
+model OAuthCode {
+  id                  String      @id @default(cuid())
+  codeHash            String      @unique
+  clientId            String
+  client              OAuthClient @relation(fields: [clientId], references: [clientId], onDelete: Cascade)
+  userId              String
+  user                User        @relation(fields: [userId], references: [id], onDelete: Cascade)
+  redirectUri         String
+  codeChallenge       String
+  codeChallengeMethod String      @default("S256")
+  scopes              String[]
+  resource            String?
+  expiresAt           DateTime
+  usedAt              DateTime?
+  createdAt           DateTime    @default(now())
+
+  @@index([clientId])
+  @@index([expiresAt])
+  @@map("oauth_codes")
+  @@schema("cultpartners")
+}
+
+// ── Trilha de auditoria da camada MCP/OAuth/API (append-only). ──
+enum AuditAction {
+  LOGIN
+  LOGIN_FAILED
+  LOGOUT
+  VIEW
+  EXPORT
+  CREATE
+  UPDATE
+  DELETE
+  REVERT
+  PURGE
+
+  @@schema("cultpartners")
+}
+
+model Auditoria {
+  id        String      @id @default(cuid())
+  createdAt DateTime    @default(now())
+  action    AuditAction
+
+  userId    String?
+  userName  String?
+  userEmail String?
+
+  entityType  String
+  entityId    String?
+  entityLabel String?
+  summary     String?
+
+  fields   Json?
+  snapshot Json?
+  meta     Json?
+
+  ip        String?
+  userAgent String?
+  route     String?
+
+  @@index([createdAt(sort: Desc)])
+  @@index([entityType, entityId, createdAt(sort: Desc)])
+  @@index([userId, createdAt(sort: Desc)])
+  @@index([action, createdAt(sort: Desc)])
+  @@map("auditoria")
+  @@schema("cultpartners")
+}
