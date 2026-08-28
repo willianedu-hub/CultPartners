@@ -1,34 +1,40 @@
 import { cookies } from "next/headers";
-import { redirect } from "next/navigation";
+import { requireUser, type SessionUser } from "@/lib/rbac";
+import { signOut } from "@/lib/auth";
 import { TopBar } from "./TopBar";
 import { Sidebar } from "./Sidebar";
 import { MobileNav } from "./MobileNav";
+import { SessionWatch } from "./SessionWatch";
 
 type Item = { href?: string; label: string; children?: Item[]; soon?: boolean; icon?: string };
 
-// Usuário placeholder da F1. A proteção de sessão (auth real, RBAC, permissões)
-// entra na F2 — aqui montamos apenas o shell visual.
-// TODO(F2): trocar por requireUser()/sessão real e recortar a navegação por permissão.
-type PlaceholderUser = { name: string; role: string };
+/**
+ * Navegação do CultPartners, recortada por audiência. Estrutura plana; "Configurações"
+ * fica na seção Admin, espelhando o agrupamento do CRM.
+ *
+ * PARCEIRO não enxerga "Parceiros" (é a listagem interna de parceiros) nem as
+ * "Configurações" internas — só o seu próprio trabalho.
+ */
+function buildNav(user: SessionUser): { main: Item[]; admin: Item[] } {
+  const isPartner = user.audience === "partner";
 
-/** Navegação do CultPartners (ordem fixa). Estrutura plana; "Configurações" fica
- *  na seção Admin, espelhando o agrupamento do CRM. */
-function buildNav(_user: PlaceholderUser): { main: Item[]; admin: Item[] } {
   const main: Item[] = [
     { href: "/dashboard", label: "Dashboard", icon: "LayoutDashboard" },
     { href: "/opportunities", label: "Oportunidades", icon: "Briefcase" },
     { href: "/pipeline", label: "Pipeline", icon: "Kanban" },
     { href: "/reports", label: "Relatórios", icon: "BarChart3" },
     { href: "/tasks", label: "Tarefas", icon: "Calendar" },
-    { href: "/partners", label: "Parceiros", icon: "Building2" },
   ];
-  const admin: Item[] = [{ href: "/settings", label: "Configurações", icon: "Settings" }];
+  if (!isPartner) {
+    main.push({ href: "/partners", label: "Parceiros", icon: "Building2" });
+  }
+
+  const admin: Item[] = isPartner ? [] : [{ href: "/settings", label: "Configurações", icon: "Settings" }];
   return { main, admin };
 }
 
 export default async function AppLayout({ children }: { children: React.ReactNode }) {
-  // TODO(F2): substituir pelo usuário autenticado da sessão.
-  const user: PlaceholderUser = { name: "Admin", role: "admin" };
+  const user = await requireUser();
   const { main, admin } = buildNav(user);
 
   const tc = (await cookies()).get("theme")?.value;
@@ -36,15 +42,18 @@ export default async function AppLayout({ children }: { children: React.ReactNod
 
   async function logout() {
     "use server";
-    // TODO(F2): encerrar a sessão real e redirecionar para /login.
-    redirect("/");
+    await signOut({ redirectTo: "/login" });
   }
+
+  const userRoles =
+    user.audience === "partner" ? "Parceiro" : user.roles.join(" · ") || "Equipe CultSec";
 
   return (
     <div className="flex min-h-screen flex-col">
+      <SessionWatch email={user.email ?? null} />
       <TopBar
-        userName={user.name}
-        userRoles="Administrador"
+        userName={user.name ?? "Usuário"}
+        userRoles={userRoles}
         theme={theme}
         logout={logout}
       />
