@@ -1,6 +1,7 @@
 import type { Metadata, Viewport } from "next";
 import { Lexend_Deca } from "next/font/google";
 import { cookies } from "next/headers";
+import { Toaster } from "@/components/ui/sonner";
 import "./globals.css";
 
 const lexend = Lexend_Deca({
@@ -36,7 +37,10 @@ export default async function RootLayout({
   const themeClass = theme === "dark" ? "dark" : theme === "navy" ? "navy" : "";
   return (
     <html lang="pt-BR" className={`${lexend.variable} ${themeClass} h-full antialiased`}>
-      <body className="flex min-h-full flex-col bg-bg text-text">{children}</body>
+      <body className="flex min-h-full flex-col bg-bg text-text">
+        {children}
+        <Toaster />
+      </body>
     </html>
   );
 }

@@ -212,8 +212,22 @@ export async function userFromApiToken(req: Request): Promise<ResultadoAuth> {
 
 /** Janela do limite e teto de chamadas nela. Por token, não por usuário nem por IP. */
 export const JANELA_MS = 60_000;
-/** Teto de chamadas por minuto por credencial no MCP. */
+/** Teto de chamadas por minuto por credencial no MCP (um chat, cadência humana). */
 export const TETO_JANELA = 120;
+/**
+ * Teto por minuto na API REST. Maior que o do MCP de propósito: do outro lado há um
+ * PROGRAMA, que pagina e itera numa cadência que um chat nunca tem. O contador da janela é o
+ * MESMO (`windowStart`/`windowCount` da linha do token) — as duas superfícies compartilham a
+ * conta, só o teto comparado muda conforme quem atende.
+ */
+export const TETO_JANELA_API = 600;
+
+/** Qual superfície está atendendo — decide só o TETO comparado, não a contagem. */
+export type Superficie = "mcp" | "api";
+
+function tetoDaSuperficie(superficie: Superficie): number {
+  return superficie === "api" ? TETO_JANELA_API : TETO_JANELA;
+}
 
 export type UsoDoToken = {
   excedeu: boolean;
@@ -236,8 +250,12 @@ export type UsoDoToken = {
  * NÃO nega uma chamada legítima quando a escrita falha: o token JÁ foi validado, e o limite é
  * proteção de CUSTO, não de acesso.
  */
-export async function touchToken(tokenId: string, agora = new Date()): Promise<UsoDoToken> {
-  const teto = TETO_JANELA;
+export async function touchToken(
+  tokenId: string,
+  agora = new Date(),
+  superficie: Superficie = "mcp",
+): Promise<UsoDoToken> {
+  const teto = tetoDaSuperficie(superficie);
   const semConta: UsoDoToken = { excedeu: false, teto, restam: teto, resetEmS: 60 };
   try {
     const atual = await prisma.apiToken.findUnique({
