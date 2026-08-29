@@ -7,6 +7,116 @@
 
 ---
 
+## Migração para Next.js + MCP/OAuth/API (2026-08)
+
+> **Seção nova, no topo.** Tudo abaixo desta seção é o handoff **do SPA** e continua
+> válido como histórico do banco/consolidação e das regras de negócio. Leia **primeiro**
+> o `CLAUDE.md` (reescrito para o novo stack) e depois esta seção.
+
+### O que mudou (SPA → Next.js)
+
+O CultPartners deixou de ser um SPA estático (HTML/CSS/JS puro + `@supabase/supabase-js`) e
+virou um app **Next.js 16 (App Router) + React 19 + Prisma 7 + Auth.js (next-auth v5) +
+Tailwind 4/shadcn**, espelhando o CRM (`crm-cultsec`). O SPA inteiro foi preservado em
+**`legacy/`** como referência (não é buildado nem servido).
+
+Além da conversão de telas, entraram **três superfícies de máquina** (as mesmas do CRM):
+
+- **MCP** (`/api/mcp`) — servidor MCP remoto, **somente leitura**, JSON-RPC 2.0 à mão,
+  tokens `cp_` (SHA-256, fail-closed), 9 ferramentas `cp_*`.
+- **OAuth 2.1** (`/api/oauth/*` + os dois `.well-known`) — o **CultPartners é o
+  Authorization Server**, federando o login para a **Microsoft/Entra**.
+- **API REST** (`/api/v1/*`) — 9 endpoints de leitura + `openapi.json` (aberto), que
+  **reaproveitam o `run()` das ferramentas MCP** (número igual ao do MCP e da tela).
+
+Duas audiências de login convivem: **INTERNO** (admins/executivos de canal via Microsoft
+Entra + senha de emergência; tabela `usuarios_internos`/model `User` + RBAC) e **PARCEIRO**
+(login+senha próprio, preservado; tabela `parceiros`). Escopo sempre server-side
+(`oportunidadeScopeWhere`): parceiro só o seu, executivo por `exec_parceiros`, admin tudo.
+
+O banco continua no projeto Supabase consolidado **`xqrudhwtdwzmgwstcyoh`**, schema
+**`cultpartners`**, mas o app agora fala Postgres **direto via Prisma** (`DATABASE_URL`),
+não mais pelo `@supabase/supabase-js`.
+
+### Fases entregues (F0–F8)
+
+- **F0 — Fundação:** projeto Next.js 16 + React 19, Tailwind 4, kit shadcn (Radix, cmdk,
+  lucide, sonner), Prisma 7 com adapter PrismaPg e schema multiSchema `cultpartners`.
+- **F1 — Modelagem/DB:** `prisma/schema.prisma` espelhando as tabelas do SPA + as novas de
+  auth/RBAC/OAuth/MCP; SQL manual `prisma/manual/2026_auth_mcp_oauth.sql` (idempotente).
+- **F2 — Auth.js (duas audiências):** login Microsoft/Entra (deny-by-default por
+  `usuarios_internos`) + login por senha; contrato `SessionUser`
+  (audience/parceiroId/execParceiroIds/roles/permissions) montado do banco.
+- **F3 — RBAC + escopo:** `rbac.ts` (gates, `oportunidadeScopeWhere`), `sessionPolicy.ts`
+  (revogação/`sessionsValidFrom`), `audit.ts`.
+- **F4 — Telas do portal:** dashboard, opportunities, pipeline (dnd-kit), reports, tasks,
+  partners, settings/{produtos,funil,perfil} — RSC + server actions, role-aware.
+- **F5 — MCP:** protocolo (`rpc.ts`/`handler.ts`), catálogo `cp_*`, `tokenAuth.ts`
+  (fail-closed), envelope anti-injeção, `forbidden.test.ts`, tela `/settings/mcp`.
+- **F6 — OAuth 2.1 (AS):** `.well-known/*`, `register/authorize/token/revoke`,
+  `/oauth/consent`, PKCE S256, refresh com rotação, tokens opacos.
+- **F7 — API REST:** `/api/v1/*` reusando o `run()` das tools, schema de saída em zod
+  (`saidas.ts`), `openapi.json` aberto.
+- **F8 — Documentação + go-live:** este handoff, `CLAUDE.md` reescrito, `README.md`, e o
+  `prisma/manual/LEIA-ME.md`.
+
+### Branch
+
+Todo o trabalho está na branch **`feat/nextjs-mcp`**. A **`main` ainda serve o SPA no
+Netlify** — o cutover para a Vercel acontece quando a verificação abaixo passar (e/ou no
+merge da branch). Ver "Checklist de go-live".
+
+### CHECKLIST DE GO-LIVE (ações do usuário)
+
+Estas etapas **dependem do usuário** (segredos, painéis, deploy). O agente não tem acesso.
+
+1. **Banco (SQL Editor do Supabase, destino `xqrudhwtdwzmgwstcyoh`, schema `cultpartners`):**
+   - Rodar `prisma/manual/2026_auth_mcp_oauth.sql` (idempotente; se avisar RLS, "Run without
+     RLS"; conferir as 15 linhas de verificação OK).
+   - Rodar `prisma/seed-auth.sql` **preenchendo nome e e-mail do admin do Entra** (os campos
+     `<< ... >>`). O e-mail tem que ser **exatamente** o e-mail corporativo do Entra do admin
+     — é a chave do casamento no login federado. (Alternativa: `seed-auth.ts` via `tsx`.)
+   - Conferir em Settings → API que `cultpartners` está em *Exposed schemas* / *Extra search
+     path* (as tabelas novas não precisam ser expostas — o app as acessa só server-side).
+2. **App Registration no Entra (Azure Portal → Microsoft Entra ID → App registrations):**
+   - Novo registro dedicado ("CultPartners"), contas **só deste diretório**.
+   - **Redirect URI (Web):** `https://SEU-DOMINIO/api/auth/callback/microsoft-entra-id`.
+   - Permissões delegadas: **`openid`, `profile`, `email`** — só isso (sem Graph).
+   - Anotar **tenant ID**, **client ID** e **client secret** (value).
+   - **Issuer** tem que ser o do **tenant**, nunca `/common/`:
+     `https://login.microsoftonline.com/<tenant-id>/v2.0`.
+3. **Env vars na Vercel** (nunca no repo — ver `.env.example`):
+   - `DATABASE_URL` — connection string do **Transaction Pooler (6543)** para produção
+     serverless (o Session pooler 5432 é para migrações).
+   - `AUTH_SECRET` (aleatório longo).
+   - `AUTH_MICROSOFT_ENTRA_ID_ID` / `_SECRET` / `_ISSUER`.
+   - `NEXT_PUBLIC_APP_URL` (trava issuer/resource do OAuth num domínio próprio).
+4. **Deploy na Vercel a partir da branch `feat/nextjs-mcp`.** Cutover **Netlify → Vercel**
+   só quando a verificação abaixo passar (a `main` segue servindo o SPA até o merge).
+5. **Roteiro de verificação (pós-deploy):**
+   - `GET /.well-known/oauth-authorization-server` e `.../oauth-protected-resource` respondem.
+   - `GET /api/mcp` (sem credencial) → **401** com header **`WWW-Authenticate`**.
+   - `claude mcp add cultpartners --transport http https://SEU-DOMINIO/api/mcp` → fluxo
+     **OAuth (login Microsoft)** → chamar `cp_whoami` e `cp_list_opportunities`.
+   - Emitir um token `cp_` em **`/settings/mcp`** e testar `/api/v1/me`, `/api/v1/opportunities`,
+     `/api/v1/openapi.json`.
+   - Conferir **escopo**: admin vê tudo; executivo de canal vê só os seus parceiros
+     (`exec_parceiros`); parceiro só as suas oportunidades; **`senhaHash` nunca aparece** em
+     nenhuma resposta.
+
+### Backlog v2
+
+- **Persistir o aprovador.** Hoje `approvedBy`/`rejectedBy` são `BigInt` legado (herdados do
+  SPA, apontavam para a tabela `admins` antiga) e o ator real da aprovação/rejeição vai na
+  **auditoria** (`auditoria`), não numa FK. Migrar essas colunas para **texto/cuid** (id de
+  `usuarios_internos`) ou torná-las **FK para `usuarios_internos`**, e passar a gravar o ator
+  na própria oportunidade além da trilha.
+- Notificações por e-mail, dashboard realtime, relatório PDF, timeline da oportunidade,
+  filtro por intervalo de datas — herdados do backlog do SPA (seção 8 abaixo).
+
+---
+
+
 ## 0. TL;DR (estado atual)
 
 - App: portal SPA (HTML/CSS/JS puro, **sem build**) para gestão de oportunidades comerciais da **CULTSEC**. Frontend em `index.html` + `js/*` + `css/app.css`.

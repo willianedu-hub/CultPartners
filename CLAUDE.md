@@ -1,236 +1,282 @@
+<!-- BEGIN:nextjs-agent-rules -->
+# This is NOT the Next.js you know
+
+This version has breaking changes — APIs, conventions, and file structure may all differ from
+your training data. Read the relevant guide in `node_modules/next/dist/docs/` before writing
+any code. Heed deprecation notices.
+<!-- END:nextjs-agent-rules -->
+
 # CLAUDE.md
 
-This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
+Guia para o Claude Code (claude.ai/code) trabalhar neste repositório.
 
-## Project Overview
+## Visão geral
 
-**CultPartners** is a single-page web portal for managing commercial opportunities for partners/resellers of CULTSEC (Brazilian cybersecurity company). Partners register deals, admins approve/reject them, and approved deals flow through a kanban pipeline with tasks.
+**CultPartners** é o portal comercial dos parceiros/revendas da **CULTSEC** (cibersegurança).
+Parceiros cadastram oportunidades, administradores aprovam/rejeitam, e os negócios aprovados
+correm num pipeline kanban com tarefas.
 
-- **Frontend:** Plain HTML + CSS + JS (no framework, no build step)
-- **Backend/DB:** Supabase (PostgreSQL) with custom auth (no Supabase Auth)
-- **Hosting:** Netlify (drag-and-drop deploy)
-- **Passwords:** bcrypt via PostgreSQL `pgcrypto` — `crypt(senha, gen_salt('bf', 12))`
-- **Logos:** Google S2 Favicons API — `https://www.google.com/s2/favicons?sz=32&domain=`
+Foi **convertido de um SPA estático** (HTML/CSS/JS puro + `@supabase/supabase-js`, hoje em
+`legacy/`) para um app **Next.js**, espelhando o CRM (`crm-cultsec`). Stack:
 
-> **DB consolidado (importante):** desde a consolidação, o app aponta para o projeto Supabase de destino e **todas as tabelas do CultPartners vivem no schema dedicado `cultpartners`** (não em `public`). O cliente é criado com `supabase.createClient(url, key, { db: { schema: 'cultpartners' } })` em `js/config.js`, então `.from()` e `.rpc()` miram esse schema automaticamente — o `data.js` usa nomes "crus", sem qualificar schema. Ver a seção **Database Consolidation** e a pasta `migrations/`.
+- **Next.js 16** (App Router) + **React 19**
+- **Prisma 7** (adapter PrismaPg) — schema Postgres dedicado **`cultpartners`** no Supabase
+- **Auth.js** (next-auth v5) — login federado Microsoft/Entra + login por senha
+- **Tailwind 4** + componentes estilo **shadcn** (Radix, cmdk, lucide-react, sonner)
+- **Deploy:** Vercel (o SPA antigo ainda serve pelo Netlify até o cutover — ver `HANDOFF.md`)
+- **Banco:** projeto Supabase consolidado `xqrudhwtdwzmgwstcyoh`; app fala Postgres direto
+  via `DATABASE_URL` (Prisma), **não** usa `@supabase/supabase-js`.
 
-## Architecture
+> **`legacy/`** guarda o SPA inteiro (`index.html` + `js/*` + `css/app.css` + `migrations/`)
+> como **referência**, não é buildado nem servido. Regras de negócio, RPCs de senha e o
+> catálogo de produtos vieram de lá.
 
-### Data flow
-All Supabase calls are centralized in `js/data.js` via the `DB` object — no other file calls `sb.from()` directly. The frontend always reads opportunities through the `v_oportunidades` view (never the raw `oportunidades` table). The view denormalizes produto, status, parceiro, and admin approver/rejecter, and includes `tarefas_total` / `tarefas_pendentes` as subqueries.
+## Banco de dados — schema `cultpartners` (Prisma multiSchema)
 
-**`DB.loadOpps()` enriches each opportunity** beyond the view: it fetches the `oportunidade_produtos` junction (N:N) and `oportunidades.valor_estimado` directly from the base table in parallel, then injects `produtos_ids` (array), `produtos_nomes` (comma-joined string) and `valor_estimado` into each row. Reason `valor_estimado` is read from the base table: a PostgreSQL view with `SELECT *` does **not** auto-pick up new columns — the view was recreated to include it, but the direct fetch also guards against a stale view. Multiple products per opportunity are the norm now; `produto_id` on `oportunidades` is kept only as a legacy/first-product fallback.
+As tabelas e enums do app vivem no schema Postgres **`cultpartners`** (não em `public`),
+declarado no `prisma/schema.prisma`:
 
-### Global state
-Everything lives in the `APP` object defined in `js/config.js`:
-```javascript
-APP.cu          // current user: { role: 'admin'|'partner', pid, name, ini, site, login }
-APP.opps        // loaded opportunities (from v_oportunidades)
-APP.statusList / APP.partners / APP.products  // reference data
-APP.visCols     // visible table columns (persisted to DB)
-APP.editId      // ID of opportunity being edited (null = new)
-APP.editTasks   // tasks being edited in modal
-APP.tSort       // { col: 'empresa', dir: 'asc' }
-APP.tPage       // current page index (0-based) for opportunities table
-APP.tPageSize   // rows per page (default 30)
+- `datasource db { … schemas = ["cultpartners"] }` — só `cultpartners` é gerenciado pelo
+  Prisma (nunca inclua `public`, senão um `db push` futuro poderia dropar objetos do outro
+  app que coabita o mesmo Postgres).
+- **Todo** `model` e **todo** `enum` tem `@@schema("cultpartners")`. Faltar um só → erro
+  `P1012` no `prisma validate`/`generate`.
+
+O Prisma qualifica os nomes como `"cultpartners"."Tabela"`, então funciona pelo Transaction
+Pooler do Supabase (6543) **sem** depender de `search_path`. `src/lib/db.ts` (adapter
+PrismaPg) não precisa de config de schema.
+
+### Migrações
+
+Usa `prisma db push` (não há `prisma/migrations`). Mudanças que o `db push` declarativo não
+faz com segurança ficam versionadas em SQL manual, rodadas **à mão no SQL Editor** do
+Supabase — ver `prisma/manual/LEIA-ME.md`. Regra de ouro: **SQL manual primeiro, `db push`
+depois** (que deve ficar em "already in sync"; as colunas do SQL espelham o `migrate diff`).
+Nunca `--accept-data-loss`/`--force-reset` em produção.
+
+- `prisma/manual/2026_auth_mcp_oauth.sql` — 2 enums + 10 tabelas de auth/RBAC/OAuth/MCP
+  (`usuarios_internos`, `roles`, `permissions`, `usuario_roles`, `role_permissions`,
+  `exec_parceiros`, `api_tokens`, `oauth_clients`, `oauth_codes`, `auditoria`), RLS + revoke.
+- `prisma/seed-auth.sql` / `prisma/seed-auth.ts` — seed de identidade interna (o admin).
+  O login Microsoft é **deny-by-default**: sem 1 usuário ativo em `usuarios_internos`,
+  ninguém entra.
+
+## Arquitetura
+
+### Rotas de tela — `src/app/(app)/**`
+
+Layout com sidebar persistente (`Sidebar.tsx`, `TopBar.tsx`, `MobileNav.tsx`,
+`SessionWatch.tsx`). Cada tela: `page.tsx` (RSC, busca dados via `data.ts`) + um client
+component + `actions.ts` (server actions) quando escreve.
+
+| Rota | O que é |
+|---|---|
+| `dashboard` | cards, donut, barras, tendência — role-aware |
+| `opportunities` | tabela com filtros/colunas/CSV + `OppModal` |
+| `pipeline` | kanban drag & drop (dnd-kit) |
+| `reports` | relatórios por produto/parceiro/status |
+| `tasks` | tarefas por oportunidade |
+| `partners` | CRUD de parceiros |
+| `settings` | índice + `settings/{mcp,produtos,funil,perfil}` |
+| `settings/mcp` | emissão/gestão das credenciais de máquina (tokens `cp_`) |
+
+### Rotas de máquina/API — `src/app/api/**` e `src/app/.well-known/**`
+
+- `api/auth/[...nextauth]` — Auth.js (login).
+- `api/mcp` — servidor MCP (JSON-RPC 2.0).
+- `api/oauth/{register,authorize,token,revoke}` — Authorization Server OAuth 2.1.
+- `api/v1/*` — API REST de leitura (ver abaixo).
+- `.well-known/oauth-authorization-server` + `.well-known/oauth-protected-resource`
+  (com a variante de sufixo `[...caminho]`) — descoberta OAuth.
+- `oauth/consent` — tela de consentimento (fora do grupo `(app)`).
+
+### Libs — `src/lib/**`
+
+| Arquivo | Responsabilidade |
+|---|---|
+| `db.ts` | cliente Prisma (adapter PrismaPg) |
+| `auth.ts` | config Auth.js: providers (Entra + Credentials), callbacks `signIn`/`jwt`/`session` |
+| `rbac.ts` | `SessionUser`, gates (`isAdmin`, `requireInternal`, `requirePartner`), `oportunidadeScopeWhere` |
+| `sessionUser.ts` | monta `SessionUser` **do banco** (`loadSessionUser`/`…ByEmail`/`loadPartnerSession`) |
+| `sessionPolicy.ts` | política de sessão (revogação, `sessionsValidFrom`) |
+| `audit.ts` | trilha de auditoria |
+| `tokenAuth.ts` | credenciais `cp_` (SHA-256, **fail-closed**) para MCP/REST |
+| `appUrl.ts` | URL pública (issuer/resource do OAuth) |
+| `money.ts` / `filters.ts` | BRL e filtros de oportunidade |
+| `mcp/**` | protocolo (`rpc.ts`, `handler.ts`), catálogo (`catalog.ts`, `tools/*`), `envelope.ts`, `dados.ts`, `limites.ts`, `forbidden.test.ts` |
+| `oauth/**` | `store.ts`, `pedido.ts`, `rules.ts`, `http.ts` |
+| `api/**` | REST: `rota.ts` (casca), `catalogo.ts`, `saidas.ts` (zod), `openapi.ts` |
+| `domain/**` | regras compartilhadas (`opps.ts`, `admin.ts`, `perfil.ts`, `leitura.ts`) |
+| `textoSeguro.ts` | limpeza de caracteres invisíveis (bidi, tag chars) |
+| `rateLimit.ts` | teto por token (Map em memória) |
+
+### Componentes — `src/components/{charts,ui,dominio}`
+
+`charts/` (Donut, BarChart, FunnelChart, RadialGauge, RankBars, Sparkline, TrendArea +
+`palette.ts`/`format.ts`); `ui/` (kit shadcn: dialog, popover, command, table-kit, sonner,
+combobox, multiselect, badges…); `dominio/` (`OppModal`, `OppFiltersBar`, `StatusBadge`,
+`AprovacaoBadge`).
+
+## Duas audiências de login
+
+O contrato central é **`SessionUser`** (`src/lib/rbac.ts`):
+
+```ts
+type SessionUser = {
+  id: string;
+  audience: "internal" | "partner";
+  name; email;
+  permissions: string[];      // RBAC (só internos)
+  roles: string[];            // internos: papéis; parceiro: ['partner']
+  parceiroId?: number | null; // só parceiro
+  execParceiroIds?: number[] | null; // executivo de canal: parceiros que enxerga; null = admin/todos
+};
 ```
 
-### Script load order (must be maintained)
-`config.js` → `ui.js` → `data.js` → `auth.js` → `nav.js` → `dashboard.js` → `table.js` → `kanban.js` → `reports.js` → `ops.js` → `admin.js` → `boot()`
+- **INTERNO** (admins e executivos de canal) — login pela **Microsoft (Entra ID)** + **senha
+  de emergência**. Linha em `usuarios_internos` (model Prisma `User`) com papéis/permissões
+  (RBAC). Provisionamento é **deny-by-default**: só entra quem tem linha **ativa** cujo
+  `email` casa exatamente com o e-mail do Entra. `sessionUser.ts` achata papéis+permissões.
+- **PARCEIRO** — login+senha próprio (preservado do SPA), tabela `parceiros`. Sem RBAC:
+  `permissions: []`, `roles: ['partner']`, `parceiroId` preenchido.
 
-### Module responsibilities
-| File | Responsibility |
-|------|---------------|
-| `config.js` | `APP` state, `SUPABASE_URL`, `SUPABASE_ANON`, `ALL_COLS`, `CHART_FILLS` |
-| `ui.js` | DOM helpers (`g`, `qs`, `qsa`, `esc`), formatters, `toast()`, `openM()`/`closeM()` |
-| `data.js` | All Supabase calls (the `DB` object) |
-| `auth.js` | `boot()`, login/logout, session management (`cp_session_v2` in localStorage) |
-| `nav.js` | `nav(page)`, `VIEW_TITLES` |
-| `dashboard.js` | `renderDash()`, `drill()`, chart renderers |
-| `table.js` | `renderTable()`, `buildFilters()`, `sortBy()`, `exportCSV()`, `buildColPicker()` |
-| `kanban.js` | `renderKanban()`, drag & drop handlers |
-| `reports.js` | `renderReports()` — by produto/parceiro/status with drill-down |
-| `ops.js` | Opportunity modal, approval flow, tasks CRUD |
-| `admin.js` | Admin CRUD for status/partners/products |
+### Escopo — sempre server-side
 
-## Key Conventions
+`oportunidadeScopeWhere(user)` (`src/lib/rbac.ts`) devolve o `where` do Prisma:
 
-### Function naming
-- `render*()` — writes HTML to DOM
-- `build*()` — builds reusable structures (filters, col picker)
-- `open*()`/`close*()` — modal control
-- `save*()`/`delete*()` — async DB operations
-- `_fn()` — module-private (not called externally)
+- **admin** → `{}` (tudo);
+- **parceiro** → só as suas (`parceiroId`; fail-closed com `-1` se ausente);
+- **executivo de canal** → `{ parceiroId: { in: execParceiroIds } }` (de `exec_parceiros`).
 
-### DOM helpers (`ui.js`)
-```javascript
-g(id)    // document.getElementById
-qs(sel)  // document.querySelector
-qsa(sel) // document.querySelectorAll
-esc(str) // XSS sanitization — escapes &, <, >, "
+**Nunca** recorte por parâmetro do cliente. As permissões do `SessionUser` de tela são
+congeladas no login (JWT); nas rotas de máquina são lidas do banco a cada chamada.
+
+## MCP — outro chat lendo o CultPartners
+
+`/api/mcp` expõe o CultPartners como servidor MCP remoto, **somente leitura**, credencial por
+pessoa herdando o RBAC dela. Espelha o desenho do CRM (`crm-cultsec/docs/mcp.md`).
+
+- **Protocolo:** JSON-RPC 2.0 sem estado, **à mão** (`src/lib/mcp/rpc.ts` + `handler.ts`),
+  sem `@modelcontextprotocol/sdk`. Métodos: `initialize`, `notifications/initialized`,
+  `tools/list`, `tools/call`, `ping`. Lote e `id:null` → `-32600`; erro de ferramenta é
+  `isError` no resultado, não erro de protocolo. GET sem credencial → 401 com
+  `WWW-Authenticate`; com credencial → 405.
+- **Identidade:** tokens `cp_<prefixo8>_<segredo>` via `tokenAuth.ts` — SHA-256 (`tokenHash`
+  `@unique`, comparação no índice), validade explícita, permissões lidas do banco a cada
+  chamada, **fail-CLOSED** (banco fora do ar → recusa). Token **só no header**; query string
+  nunca autentica. Emitido na tela `/settings/mcp` (segredo mostrado uma única vez).
+- **As 9 ferramentas** (`cp_*`, `tools/list` devolve só o que a pessoa pode usar):
+  `cp_whoami`, `cp_list_opportunities`, `cp_get_opportunity`, `cp_pipeline_by_stage`,
+  `cp_list_partners`, `cp_list_products`, `cp_list_status`, `cp_list_tasks`,
+  `cp_reports_summary`.
+- **Anti-injeção** (`envelope.ts` + `textoSeguro.ts`): a v1 **não escreve** (o que de fato
+  limita o dano), limpeza incondicional de invisíveis em toda string, e cerca com nonce por
+  resposta + marca por campo de texto livre.
+
+## OAuth 2.1 — o CultPartners é o Authorization Server
+
+Federando o login para a **Microsoft**. O caminho "Entra como AS" está documentado como
+**quebrado** no CRM (conflito de `resource` RFC 8707 × RFC 9728) — não refaça a análise;
+**o AS é o CultPartners** e o Entra entra só como IdP do login humano.
+
+- `.well-known/oauth-authorization-server` (RFC 8414, `S256`) e
+  `.well-known/oauth-protected-resource` (RFC 9728, com variante de sufixo).
+- `POST /api/oauth/register` (RFC 7591, registro dinâmico; `OAUTH_DCR_DISABLED=1` desliga).
+- `GET/POST /api/oauth/authorize` (exige sessão; consentimento em `/oauth/consent`;
+  recusa sob impersonation — que aqui nem existe).
+- `POST /api/oauth/token` (`authorization_code` + `refresh_token` com rotação).
+- `POST /api/oauth/revoke` (RFC 7009).
+- **PKCE S256 obrigatório**, `redirect_uri` por string exata, código de uso único consumido
+  antes do PKCE, refresh rotaciona, tokens **opacos** (SHA-256 no banco, sem JWT). O access
+  token é uma linha de `api_tokens` com `kind: "oauth"` — mesmo caminho de validação dos `cp_`.
+
+## API REST — `/api/v1`
+
+Para **programa** (endereço estável), não para modelo escolher ferramenta. Mesma identidade,
+escopo e auditoria do MCP. **As rotas reaproveitam o `run` das ferramentas MCP**
+(`src/lib/api/rota.ts`) — é isso que garante, por construção, que o número da API é o mesmo
+do MCP e da tela. Não copie o molde de uma rota sem o filtro de dono (foi assim que nasceram
+vazamentos de escopo no CRM).
+
+| rota | ferramenta |
+|---|---|
+| `GET /api/v1/me` | `cp_whoami` |
+| `GET /api/v1/opportunities` | `cp_list_opportunities` |
+| `GET /api/v1/opportunities/{id}` | `cp_get_opportunity` |
+| `GET /api/v1/opportunities/pipeline` | `cp_pipeline_by_stage` |
+| `GET /api/v1/partners` | `cp_list_partners` |
+| `GET /api/v1/products` | `cp_list_products` |
+| `GET /api/v1/status` | `cp_list_status` |
+| `GET /api/v1/tasks` | `cp_list_tasks` |
+| `GET /api/v1/reports` | `cp_reports_summary` |
+| `GET /api/v1/openapi.json` | — (**aberto**, sem credencial) |
+
+Diferenças do MCP: sem cerca/marca (corromperia valores num programa), mas **com** limpeza de
+invisíveis; escopo em campo estruturado; "não é seu" vira **404** (igual a "não existe");
+schema de saída em zod (`saidas.ts`) é a fonte do OpenAPI.
+
+## Regras críticas (não reverter)
+
+1. **MCP é read-only.** `src/lib/mcp/forbidden.test.ts` varre `src/lib/mcp/**` e
+   `src/app/api/mcp/**` e **quebra o build** se aparecer verbo de escrita do Prisma, SQL cru,
+   `cookies()`, ou uma ferramenta sem `escreve: false`.
+2. **Nunca expor `senhaHash`/`senha_hash`** (nem de `parceiros`, nem de `usuarios_internos`)
+   em nenhuma superfície de máquina ou payload.
+3. **Escopo sempre server-side** via `oportunidadeScopeWhere` — nunca por parâmetro do cliente.
+4. **Soft delete only** (`deletedAt`/`deleted_at`); nunca hard delete.
+5. **OAuth:** PKCE **S256** obrigatório, `redirect_uri` por string exata, tokens **opacos**
+   (SHA-256), refresh rotaciona.
+6. **`tokenAuth` é fail-closed** — se não deu para verificar a credencial, recusa.
+7. **`service_role` / connection string / secret** só server-side, **nunca no repo nem no
+   cliente** — variáveis de ambiente (Vercel). Ver `.env.example`.
+8. **Senhas nunca hasheadas no cliente** — bcrypt via `bcryptjs` no servidor (ou RPCs do
+   pgcrypto no fluxo legado).
+
+## Convenções
+
+- **RSC por padrão**; `"use client"` só onde há estado/efeito. `page.tsx` busca via `data.ts`;
+  escrita em `actions.ts` (server actions).
+- **Nomes de arquivo em português** nas libs novas (`dados.ts`, `saidas.ts`, `pedido.ts`) —
+  siga o padrão do módulo ao editar; MCP emite chaves em português (`nome`, `empresa`).
+- **`SessionUser` vem do banco** nas rotas de máquina; do JWT nas telas.
+- **Auditoria:** uma linha por `tools/call`/chamada REST; acima de 50 registros o evento
+  sobe de `VIEW` para `EXPORT`.
+
+## Comandos
+
+```bash
+npm install                 # postinstall roda prisma generate
+npm run dev                 # next dev
+npm run build               # next build
+npm run start               # next start (produção local)
+npm run lint                # eslint
+npx prisma generate         # cliente Prisma
+npx prisma db push          # aplica schema (deve dizer "already in sync" após o SQL manual)
+npx vitest run              # testes (inclui forbidden.test.ts)
 ```
 
-### Formatters (`ui.js`)
-```javascript
-fmtMonth(val)       // "2025-06-01" or "2025-06" → "Jun/25"
-monthToDate(ym)     // "2025-06" → "2025-06-01"  (use when saving to DB)
-dateToMonth(d)      // "2025-06-01" → "2025-06"  (use for input[type=month])
-fmtDate(d)          // "2025-06-01" → "01/06/2025"
-fmtDateTime(d)      // ISO → "01/06/2025 14:30"
-logoImg(site, alt)  // returns <img> with Google S2 favicon or ''
-fmtBRL(v)           // 85000 → "R$ 85.000,00"
-fmtBRLShort(v)      // 85000 → "R$ 85K" · 1200000 → "R$ 1,2M"  (compact, for cards/kanban)
-maskBRL(el)         // input mask: types digits → "1.234,56"
-parseBRL(str)       // "1.234,56" → 1234.56 (null if empty/zero) — use when saving valor_estimado
-prodTagsHtml(nomes, max=2) // comma-joined product names → compact tags + "+N" overflow badge
-```
+## Fluxo de banco neste ambiente (importante)
 
-### Async error handling pattern
-```javascript
-loadingShow(true);
-try {
-  await DB.someMethod();
-  toast('✅ Success message');
-} catch (e) {
-  toast('Erro: ' + e.message, 'bad');
-  console.error(e);
-} finally {
-  loadingShow(false);
-}
-```
+Alguns ambientes de agente **bloqueiam** o egress ao Supabase (Postgres 5432/6543 e
+`*.supabase.co`/`api.supabase.com` por política) — 403 no proxy. Quando isso acontece **não**
+dá para rodar `psql`/`pg_dump`/Management API nem `prisma db push` a partir do Claude: o
+**usuário** roda o SQL no **SQL Editor** (navegador) e cola o resultado. Os SQLs de
+`prisma/manual/` foram desenhados para esse fluxo (idempotentes, verificação com linhas
+rotuladas). Teste o acesso antes; se bloquear, use o SQL Editor.
 
-## Database
+## Gotchas
 
-### Tables
-- `admins` — `id, nome, login (UNIQUE), senha_hash, email, ativo`
-- `parceiros` — `id, nome, cnpj, site, login (UNIQUE), senha_hash, email, ativo, deleted_at`
-- `status_funil` — `id, nome (UNIQUE), cor (hex), ordem (SMALLINT), ativo`
-- `produtos` — `id, nome (UNIQUE), categoria, descricao, ativo, ordem (SMALLINT)` — 35-product catalog in 5 categories; `ordem` groups the multi-level picker
-- `oportunidades` — `id, empresa, cnpj, site_empresa, contato, cargo, obs, produto_id, status_id, fechamento (DATE), parceiro_id, aprovacao (ENUM: Pendente|Aprovado|Rejeitado), approved_by, rejected_by, deleted_at, valor_estimado (NUMERIC(14,2))`
-- `oportunidade_produtos` — N:N junction: `oportunidade_id (CASCADE DELETE), produto_id`, PK on both. One opportunity → many products.
-- `tarefas` — `id, oportunidade_id (CASCADE DELETE), descricao, prazo, responsavel, concluida, concluida_em`
-- `preferencias_usuario` — `user_key (PK), colunas (JSONB)`
-- `audit_log` — `id, tabela, registro_id, acao, usuario, dados_antes (JSONB), dados_depois (JSONB)`
+- **SQL single quotes:** escapar com `''` (dois apóstrofos), nunca `\'`.
+- **`create index concurrently`** não roda dentro da transação do SQL Editor — evite em SQL
+  manual (o CRM tem `sqlManual.test.ts` guardando isso).
+- **`prisma db pull`** regenera o schema e apaga comentários/`@@schema` — ajuste à mão.
+- **Push rejeitado (non-fast-forward):** `git pull origin <branch> --no-rebase` e `git push`.
+- **Edit tool:** o arquivo precisa ser `Read` ao menos uma vez na sessão antes do `Edit`.
+- **Identidade Git deste repo:** commitar como `julianafsgpimentel@gmail.com`.
 
-**`aprovacao_status`** is a custom ENUM (`Pendente|Aprovado|Rejeitado`). The `empresa` GIN trigram index needs `pg_trgm`; passwords need `pgcrypto` — both installed in the `extensions` schema. All the above tables live in the **`cultpartners`** schema.
+## Documentos irmãos
 
-### RPC Functions (called via `sb.rpc()`)
-```
-fn_login_admin(p_login, p_senha)        → admin row without senha_hash
-fn_login_parceiro(p_login, p_senha)     → parceiro row without senha_hash
-fn_set_senha_parceiro(p_id, p_senha)    → bcrypt hash in DB
-fn_set_senha_admin(p_id, p_senha)       → bcrypt hash in DB
-fn_delete_oportunidade(p_id, p_usuario) → soft delete + audit_log entry
-```
-
-### RLS
-All tables use `allow_all` via anon key (in `cultpartners`, RLS is enabled with `allow_all` policies re-created for the schema). Partner data isolation is enforced in JS with `.eq('parceiro_id', cu.pid)` / by loading opps filtered by `parceiro_id` — **not** by row-level policies. The RPC functions are `SECURITY DEFINER` with `SET search_path = cultpartners, extensions, public` so `crypt()`/`gen_salt()` resolve.
-
-## Database Consolidation (schema `cultpartners`)
-
-The CultPartners database was **consolidated into another Supabase project** (the app now points there via `js/config.js`). To avoid mixing tables, all CultPartners objects live in a dedicated **`cultpartners`** schema; the other app keeps its own `public`. Because both share one Postgres, cross-app reads are native cross-schema SQL (no Foreign Data Wrapper).
-
-The migration lives in `migrations/`, run in order in the **destination** project's SQL Editor:
-1. `consolidacao_01_schema.sql` — schema, ENUM, extensions, 9 tables, view, 7 functions, triggers, RLS, grants (`anon`/`authenticated`/`service_role`), `NOTIFY pgrst`.
-2. `consolidacao_02_dados.sql` — data (179 rows) with `OVERRIDING SYSTEM VALUE` (ids are `GENERATED ALWAYS AS IDENTITY`), FK-safe order, sequence resets, `TRUNCATE … RESTART IDENTITY` at top (rerunnable).
-3. **Dashboard step (not SQL):** Settings → API → add `cultpartners` to *Exposed schemas* and *Extra search path*, then reload — required for PostgREST/supabase-js to see the schema.
-
-Other migrations: `multi_produto.sql` (junction + 35-product catalog), `valor_estimado.sql` (column + view recreate), `seed_movti_opps.sql` (sample opps for partner Movti, id 11).
-
-**Gotchas that bit us:** (a) a `SELECT *` view does not auto-add new base columns — recreate it; (b) `CREATE OR REPLACE VIEW` fails if column order changes — use `DROP VIEW` + `CREATE`; (c) identity columns need `OVERRIDING SYSTEM VALUE` on data load; (d) SECURITY DEFINER functions must pin `search_path` to find pgcrypto in `extensions`.
-
-## Design System (`css/app.css`)
-
-```css
---sidebar-bg: #10112a   /* dark navy sidebar */
---primary: #7c3aed      /* CULTSEC purple */
---accent: #c026d3       /* CULTSEC magenta */
---gradient: linear-gradient(135deg, #c026d3 0%, #7c3aed 60%, #0ea5e9 100%)
---bg: #f6f7fb / --surface: #fff / --surface2: #f0f1fa / --surface3: #e8eaf5
---text: #1e1e3a / --text2: #4a4a7a / --text3: #8888b0
-```
-
-Typography: `Rajdhani` 700 (headings) + `Plus Jakarta Sans` 400/500/600 (body) from Google Fonts.
-
-## Critical Rules (Do Not Revert)
-
-1. **Passwords are never hashed in JS** — plaintext goes to the DB; PostgreSQL calls `crypt()` via RPC functions (`fn_login_admin`, `fn_login_parceiro`, `fn_set_senha_*`).
-2. **Always read opportunities via `v_oportunidades`** — never `SELECT` directly from the `oportunidades` table.
-3. **`DB.saveTasks()` uses a smart diff** — upsert existing tasks (numeric id = from DB), insert new ones (string id = temporary). Never delete-all + reinsert.
-4. **Soft delete only** — use `fn_delete_oportunidade()` (logs to `audit_log`) and `DB.softDeletePartner()`. Never hard delete.
-5. **Always wrap user content with `esc()`** — any DB data rendered via `innerHTML` must pass through `esc()`.
-6. **`fechamento` is always a `DATE`** — save as `YYYY-MM-01` using `monthToDate()`. Never save as `"YYYY-MM"` string.
-7. **No loose globals** — all state goes in `APP.*`.
-
-## Implemented Features
-
-- Login/logout with session in localStorage (`cp_session_v2`), two roles: `admin` and `partner`; `APP.cu` includes `login` field
-- Collapsible sidebar with tooltips in collapsed mode; Gmail-style user menu in topbar
-- Dashboard: 4 stat cards, donut chart, bar by partner, line chart by fechamento — all with drill-down
-- Dashboard drill-down modals have inline approve/reject actions for admins (pending rows get ✅/❌; rejected get ↩ Reverter)
-- Dashboard 60-day alert: styled table at bottom of dashboard (color-coded: >60d yellow, >90d orange, >120d red); "Ganho" opportunities excluded
-- Opportunities table: column sort, filters, column picker (persisted to DB), CSV export, double-click to edit
-- **Table pagination**: `buildPagerHTML(total, page, ps, goFn, sizeFn)` in `table.js`; default 30 rows, options 10/30/50/100; drill modals also paginated via closure state (`window._drillGoPage` / `window._drillSetSize`)
-- Kanban drag & drop with optimistic update + rollback on error
-- Reports: by produto, parceiro conversion, status tiles — all with drill-down
-- Opportunity modal: new + edit, real-time duplicate detection, auto-logo from `site_empresa`
-- Approval flow: Pendente → Aprovado | Rejeitado (reason required); admin can revert Rejeitado → Aprovado
-- Tasks per opportunity: create, complete, delete — alert if approved 60+ days with no task
-- Admin CRUD: funil status, partners (with edit), products/services
-- Soft delete via `fn_delete_oportunidade()` (audit_log); soft delete for partners via `DB.softDeletePartner()`
-- **Change password modal** (`mSenha`): validates current password via login RPC, enforces min 8 chars + uppercase + number + special; strength indicator in real-time
-- **Audit log viewer** in Configurações: filterable by action/user, paginated, color-coded admin (purple) vs partner (blue) rows
-- `DB.changePassword(role, id, nova)` and `DB.loadAuditLog()` added to `data.js`
-- **Multi-product per opportunity**: grouped, collapsible, multi-select picker in the opportunity modal (`_buildProdPicker`/`toggleProdCat`/`_getSelectedProdIds` in `ops.js`); saved via `DB.saveOppProducts(oppId, ids)` into `oportunidade_produtos`. Products shown as compact tags (`prodTagsHtml`) in table/kanban/dashboard/reports; charts group by `produtos_ids`. On edit, product is optional (legacy opps whose products were deactivated still save).
-- **Estimated deal value** (`valor_estimado`): masked BRL input in the modal; "Valor Est." column in the table + CSV; value on kanban cards; 3 financial stat cards on the dashboard (Valor Pipeline / Valor Ganhos / Ticket Médio) and 4 on reports (Total Prospectado / Ganhos / Perdidos / Conversão por Valor) + a "Valor por Parceiro/Produto" bar
-- **Role-aware charts**: partners never see cross-partner data. `_renderBarPartner`/`_renderConversionBar`/`_renderValorBar` branch on `APP.cu.role` (admin → by partner; partner → by product). Partner filter dropdown emptied for partners in `buildFilters()`.
-
-## Pending Backlog
-
-- [ ] Email notifications (Supabase Edge Functions + Resend/SendGrid): new pending opportunity, approval/rejection, 60-day task alert
-- [ ] Realtime dashboard updates via `supabase.channel()`
-- [ ] Exportable PDF report
-- [ ] Opportunity movement timeline/history
-- [ ] Date range filter on dashboard
-- [ ] Multiple admin levels/permissions
-- [ ] Bidirectional read of the *other* app's schema from within CultPartners (recommended: a view inside `cultpartners` that selects from the other schema, to keep `data.js` bare-name convention)
-
-Done recently (kept for reference): estimated deal value ✅, multi-product per opportunity ✅, partner-specific dashboard/charts ✅.
-
-## Branches
-
-| Branch | Purpose |
-|--------|---------|
-| `main` | **Current working/production branch** for CultPartners (CULTSEC). Development now happens directly on `main`. |
-| `claude/cd-cultpartners-lWyXn` | Former dev branch (fully merged into `main`). |
-| `cliente-takoda` | Client deployment — Takoda Data Centers (orange branding, separate Supabase) |
-
-## Client Branch: cliente-takoda
-
-Takoda Data Centers white-label deployment. Key differences from main:
-- **Colors**: `--primary: #E85D1A` (orange), `--accent: #F5A623` (gold)
-- **Logo**: `assets/takoda-logo.png` (file exists in repo)
-- **Title**: "TakodaPartners – Takoda Data Centers"
-- **Powered by VSYNC** tagline on login screen
-- **Supabase credentials** in `js/config.js` point to Takoda's own project
-- **SQL setup files** (run in order on Takoda's Supabase):
-  1. `takoda_part1_schema.sql` — tables + view
-  2. `takoda_part2_rls_functions.sql` — RLS + RPCs + trigger
-  3. `takoda_part3_seed_base.sql` — admin (`admin`/`Takoda@2025!`), status, 12 products, 10 partners (`Parceiro@2025!`)
-  4. `takoda_part4_seed_opps_a.sql` — opportunities 1–75
-  5. `takoda_part5_seed_opps_b.sql` — opportunities 76–155 + demo tasks
-- **Deployed on Vercel** pointing to `cliente-takoda` branch (set as GitHub default branch)
-- **Mobile hamburger menu**: `toggleMobileSidebar()` / `closeMobileSidebar()` in `ui.js`; overlay `#sidebarOverlay`; sidebar closes on `nav()` call
-
-## Deployment
-
-No build step. Deploy by uploading the folder contents to Netlify. The `_redirects` file handles SPA routing (`/* /index.html 200`). For Vercel, use `vercel.json` with rewrites to `/index.html`.
-
-## Known Patterns / Gotchas
-
-- **Stream timeout**: When generating large files (SQL, HTML), go directly to `Write` tool — avoid long text responses before tool calls.
-- **SQL single quotes**: Use `''` (two apostrophes) to escape, never `\'` — PostgreSQL does not accept backslash escaping in standard strings.
-- **Push rejected (non-fast-forward)**: Run `git pull origin <branch> --no-rebase` then `git push`.
-- **Edit tool**: File must be `Read` at least once in the session before `Edit` will work.
-- **No DB access from the agent environment**: some Claude Code environments block outbound to Supabase (Postgres port 5432 and `*.supabase.co`/`api.supabase.com` over HTTPS) by egress policy. When that happens you **cannot** run `psql`/`pg_dump` or the Management API from the agent — the user runs SQL in the Supabase **SQL Editor** (browser) and pastes results back. To extract data for migration: `SELECT json_build_object('table', (SELECT json_agg(t) FROM public.table t), …)` → paste JSON → generate INSERTs with a local Python script.
-- **Credentials**: only the Supabase URL + anon (publishable) key belong in `js/config.js` (they ship to the browser, public by design). Never put the Postgres connection string / service_role key / Personal Access Token in the repo — those stay with the user.
+- `HANDOFF.md` — estado vivo, migração Next.js, checklist de go-live (ações do usuário).
+- `README.md` — o que é, stack e como rodar local.
+- `crm-cultsec/CLAUDE.md` (→ `AGENTS.md`) e `crm-cultsec/docs/mcp.md` — referência do desenho.
+- `legacy/` — SPA antigo (referência histórica).
