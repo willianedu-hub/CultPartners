@@ -55,13 +55,16 @@ where not exists (select 1 from "cultpartners"."roles" where "name" = 'exec_cana
 -- passwordHash fica NULL: entra só por Microsoft. (Porta de emergência opcional: gere um
 -- bcrypt e coloque no lugar do null — o app aceita senha local para o admin.)
 -- >>>>>>>>>>>>>>>>>>>>>>>>>  PREENCHA OS DOIS CAMPOS  <<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<
-insert into "cultpartners"."usuarios_internos" ("id", "name", "email", "passwordHash", "active")
+-- NOTA: "updatedAt" é NOT NULL e NÃO tem default (o Prisma preenche em código; num
+-- INSERT cru é obrigatório informar). Por isso vai CURRENT_TIMESTAMP explícito.
+insert into "cultpartners"."usuarios_internos" ("id", "name", "email", "passwordHash", "active", "updatedAt")
 select
   'seed_user_admin',
   '<< NOME DO ADMIN >>',                    -- ex.: 'Fulano de Tal'
   '<< email.corporativo@cultsec.com.br >>', -- e-mail EXATO do Entra do admin
   null,
-  true
+  true,
+  CURRENT_TIMESTAMP
 where not exists (
   select 1 from "cultpartners"."usuarios_internos"
   where "email" = '<< email.corporativo@cultsec.com.br >>'
@@ -85,8 +88,8 @@ where u."id" = 'seed_user_admin' and r."name" = 'admin'
 -- em exec_parceiros (uma linha por parceiro). Sem linhas em exec_parceiros ele não vê
 -- nenhum parceiro.
 --
---   insert into "cultpartners"."usuarios_internos" ("id","name","email","passwordHash","active")
---   values ('seed_user_exec_maria', 'Maria Exec', 'maria@cultsec.com.br', null, true);
+--   insert into "cultpartners"."usuarios_internos" ("id","name","email","passwordHash","active","updatedAt")
+--   values ('seed_user_exec_maria', 'Maria Exec', 'maria@cultsec.com.br', null, true, CURRENT_TIMESTAMP);
 --
 --   insert into "cultpartners"."usuario_roles" ("userId","roleId")
 --   select 'seed_user_exec_maria', r."id" from "cultpartners"."roles" r where r."name"='exec_canal';
